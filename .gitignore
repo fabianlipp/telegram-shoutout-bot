@@ -1,0 +1,4 @@
+/telegram_shoutout_bot_conf.py
+.idea
+__pycache__
+/testdb.sqlite
