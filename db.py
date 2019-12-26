@@ -86,10 +86,12 @@ class UserDatabase:
 class ChannelDatabase:
     db = None
     channels = None
+    channels_by_name = None
 
     def __init__(self, db):
         self.db = db
         session = self.db.get_session()
         db_channels = session.query(Channel).all()
         self.channels = {channel.id: channel for channel in db_channels}
+        self.channels_by_name = {channel.name: channel for channel in db_channels}
         session.close()
