@@ -1,11 +1,18 @@
 import time
 
-from sqlalchemy import Column, Integer, String, Float, Boolean
+from sqlalchemy import Table, Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker  #, scoped_session
+from sqlalchemy.orm import sessionmaker, relationship, selectinload  # , scoped_session
 from sqlalchemy import create_engine
+from sqlalchemy.orm.collections import attribute_mapped_collection
 
 Base = declarative_base()
+
+
+user_channels = Table('user_channels', Base.metadata,
+                      Column('chat_id', ForeignKey('users.chat_id'), primary_key=True),
+                      Column('channel_id', ForeignKey('channels.id'), primary_key=True)
+                      )
 
 
 class User(Base):
@@ -17,6 +24,11 @@ class User(Base):
     time_start = Column(Integer)
     last_msg = Column(String)
     is_admin = Column(Boolean)
+
+    channels = relationship('Channel',
+                            collection_class=attribute_mapped_collection('name'),
+                            secondary=user_channels,
+                            back_populates='users')
 
     def __init__(self, chat_id, username, first_name, last_name, time_start=None):
         self.chat_id = chat_id
@@ -39,6 +51,8 @@ class Channel(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String)
     description = Column(String)
+
+    users = relationship('User', secondary=user_channels, back_populates='channels')
 
 
 class MyDatabase:
@@ -66,16 +80,23 @@ class UserDatabase:
     def __init__(self, db):
         self.db = db
         session = self.db.get_session()
-        db_users = session.query(User).all()
+        db_users = session.query(User).options(selectinload(User.channels)).all()
         self.users = {user.chat_id: user for user in db_users}
         session.close()
 
     def add_user(self, chat_id, username, first_name, last_name):
-        # TODO: Check if user exists
-        user = User(chat_id, username, first_name, last_name)
-        # TODO: Add to list
+        if chat_id not in self.users:
+            user = User(chat_id, username, first_name, last_name)
+            session = self.db.get_session()
+            session.add(user)
+            self.users[chat_id] = user
+            session.commit()
+            session.close()
+
+    def delete_user(self, chat_id):
         session = self.db.get_session()
-        session.add(user)
+        session.query(User).filter(User.chat_id == chat_id).delete()
+        del self.users[chat_id]
         session.commit()
         session.close()
 
