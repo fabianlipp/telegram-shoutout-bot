@@ -51,6 +51,7 @@ class Channel(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String)
     description = Column(String)
+    default = Column(Boolean, default=False)
 
     users = relationship('User', secondary=user_channels, back_populates='channels')
 
@@ -86,8 +87,11 @@ class UserDatabase:
 
     def add_user(self, chat_id, username, first_name, last_name):
         if chat_id not in self.users:
-            user = User(chat_id, username, first_name, last_name)
             session = self.db.get_session()
+            user = User(chat_id, username, first_name, last_name)
+            # Add user to default channels
+            for channel in session.query(Channel).filter(Channel.default.is_(True)).all():
+                user.channels[channel.name] = channel
             session.add(user)
             self.users[chat_id] = user
             session.commit()

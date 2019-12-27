@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 
 # TODO: Log all (admin) queries
 
+# States for send conversation
 CHANNEL, MESSAGE, CONFIRMATION = range(3)
+
+# TODO: Implement /help and /settings (standard commands according to Telegram documentation)
 
 
 class TelegramShoutoutBot:
@@ -189,7 +192,7 @@ class TelegramShoutoutBot:
                 MESSAGE: [CommandHandler('done', self.answer_done),
                           send_cancel_handler,
                           # TODO More restrictive filter here?
-                          # TODO Handler for non-matched messages (incl. cancel)?
+                          # TODO Handler for non-matched messages?
                           MessageHandler(Filters.all & (~ Filters.command), self.answer_message)],
                 CONFIRMATION: [CommandHandler('confirm', self.answer_confirm),
                                send_cancel_handler,
@@ -236,7 +239,6 @@ class MQBot(telegram.bot.Bot):
     @mq.queuedmessage
     def send_sticker(self, *args, **kwargs):
         return super(MQBot, self).send_sticker(*args, **kwargs)
-
 
 
 if __name__ == '__main__':
