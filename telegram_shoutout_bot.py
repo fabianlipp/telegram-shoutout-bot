@@ -18,6 +18,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # TODO: Log all (admin) queries
+# TODO: Improve error logging
 
 # States for send conversation
 CHANNEL, MESSAGE, CONFIRMATION = range(3)
@@ -26,7 +27,8 @@ UNSUBSCRIBE_CHANNEL = range(1)
 
 
 # TODO: Implement /help and /settings (standard commands according to Telegram documentation)
-# TODO: Not checking for admin permissions in the required places so far
+# TODO: Not checking for admin permissions in the required places so far: /send
+# TODO: Exception Handling (e.g., for database queries)
 
 
 class TelegramShoutoutBot:
@@ -55,12 +57,10 @@ class TelegramShoutoutBot:
                  "/admin\n" \
                  "/send\n" \
                  "/subscribe\n" \
-                 "/unsubscribe\n"
+                 "/unsubscribe\n" \
+                 "/register\n" \
+                 "/unregister\n"
         context.bot.send_message(chat_id=chat_id, text=answer)
-
-    # TODO: DEBUG ONLY
-    def cmd_echo(self, update: Update, context: CallbackContext):
-        context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
 
     def cmd_admin(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
@@ -75,6 +75,16 @@ class TelegramShoutoutBot:
                      "hast aber noch keine Admin-Rechte in Telegram.\n" \
                      "Wende dich mit deiner Chat-ID {0} ans Webteam um Admin-Rechte zu erhalten.".format(chat_id)
         context.bot.send_message(chat_id=chat_id, text=answer)
+
+    def cmd_register(self, update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
+        # TODO
+        context.bot.send_message(chat_id=chat_id, text="Not implemented")
+
+    def cmd_unregister(self, update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
+        self.user_database.remove_ldap(chat_id)
+        context.bot.send_message(chat_id=chat_id, text="Account-Zuordnung entfernt")
 
     # Starting here: Functions for conv_send_handler
     def cmd_send(self, update: Update, context: CallbackContext):
@@ -283,6 +293,10 @@ class TelegramShoutoutBot:
         dispatcher.add_handler(help_handler)
         admin_handler = CommandHandler('admin', self.cmd_admin)
         dispatcher.add_handler(admin_handler)
+        register_handler = CommandHandler('register', self.cmd_register)
+        dispatcher.add_handler(register_handler)
+        unregister_handler = CommandHandler('unregister', self.cmd_unregister)
+        dispatcher.add_handler(unregister_handler)
 
         send_cancel_handler = CommandHandler('cancel', self.cancel_send)
         conv_send_handler = ConversationHandler(
@@ -321,9 +335,6 @@ class TelegramShoutoutBot:
             fallbacks=[unsubscribe_cancel_handler]
         )
         dispatcher.add_handler(conv_unsubscribe_handler)
-
-        #echo_handler = MessageHandler(Filters.text, self.cmd_echo)
-        #dispatcher.add_handler(echo_handler)
 
         # log all errors
         dispatcher.add_error_handler(self.error)

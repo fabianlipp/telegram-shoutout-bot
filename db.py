@@ -122,6 +122,12 @@ class UserDatabase:
         session.commit()
         session.close()
 
+    def remove_ldap(self, chat_id):
+        session = self.db.get_session()
+        user = session.query(User).filter(User.chat_id.is_(chat_id)).one()
+        user.ldap_account = None
+        session.commit()
+        session.close()
 
 
 class ChannelDatabase:
