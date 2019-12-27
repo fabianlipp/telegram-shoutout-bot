@@ -52,6 +52,7 @@ class Channel(Base):
     name = Column(String, unique=True)
     description = Column(String)
     default = Column(Boolean, default=False)
+    ldap_filter = Column(String)
 
     users = relationship('User', secondary=user_channels, back_populates='channels')
 

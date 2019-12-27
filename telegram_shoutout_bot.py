@@ -64,7 +64,7 @@ class TelegramShoutoutBot:
 
     def cmd_admin(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
-        user = self.user_database.get_by_chat_id(update.effective_chat.id)
+        user = self.user_database.get_by_chat_id(chat_id)
         if user.ldap_account is None:
             answer = "Du hast keinen DPSG-Account mit deinem Telegram-Zugang verbunden."
         elif self.ldap_access.check_usergroup(user.ldap_account):
@@ -88,24 +88,39 @@ class TelegramShoutoutBot:
 
     # Starting here: Functions for conv_send_handler
     def cmd_send(self, update: Update, context: CallbackContext):
-        answer = "Kanal eingeben, an den die Nachricht gesendet werden soll.\n" \
-                 "Verfügbare Kanäle:\n" + self.get_all_channel_list()
-        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
-        return CHANNEL
+        chat_id = update.effective_chat.id
+        user = self.user_database.get_by_chat_id(chat_id)
+        if user.ldap_account is not None and self.ldap_access.check_usergroup(user.ldap_account):
+            answer = "Kanal eingeben, an den die Nachricht gesendet werden soll.\n" \
+                     "Verfügbare Kanäle:\n" + self.get_all_channel_list()
+            context.bot.send_message(chat_id=chat_id, text=answer)
+            return CHANNEL
+        else:
+            answer = "Du hast keine Admin-Rechte um Nachrichten zu verschicken."
+            context.bot.send_message(chat_id=chat_id, text=answer)
+            return ConversationHandler.END
 
     def answer_channel(self, update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
         requested_channel = update.message.text
-        if requested_channel in self.channel_database.channels_by_name:
-            send_data = SendData()
-            context.user_data["send"] = send_data
-            send_data.channel = requested_channel
-            answer = "Nachricht eingeben, die gesendet werden soll."
-            context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
-            return MESSAGE
-        else:
+        user = self.user_database.get_by_chat_id(chat_id)
+        if requested_channel not in self.channel_database.channels_by_name:
             answer = "Kanal nicht vorhanden. Bitte anderen Kanal eingeben."
-            context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+            context.bot.send_message(chat_id=chat_id, text=answer)
             # no return statement (stay in same state)
+        else:
+            channel = self.channel_database.channels_by_name[requested_channel]
+            if self.ldap_access.check_filter(user.ldap_account, channel.ldap_filter):
+                send_data = SendData()
+                context.user_data["send"] = send_data
+                send_data.channel = requested_channel
+                answer = "Nachricht eingeben, die gesendet werden soll."
+                context.bot.send_message(chat_id=chat_id, text=answer)
+                return MESSAGE
+            else:
+                answer = "Du hast keine Berechtigung an diesen Kanal zu schreiben."
+                context.bot.send_message(chat_id=chat_id, text=answer)
+                # no return statement (stay in same state)
 
     def answer_message(self, update: Update, context: CallbackContext):
         send_data = context.user_data["send"]  # type: SendData
