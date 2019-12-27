@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 CHANNEL, MESSAGE, CONFIRMATION = range(3)
 
 # TODO: Implement /help and /settings (standard commands according to Telegram documentation)
+# TODO: Not checking for admin permissions in the required places so far
 
 
 class TelegramShoutoutBot:
@@ -34,11 +35,21 @@ class TelegramShoutoutBot:
         context.bot.send_message(chat_id=chat.id, text="Herzlich willkommen!")
 
     def cmd_stop(self, update: Update, context: CallbackContext):
-        chat = update.effective_chat
-        self.user_database.delete_user(chat.id)
+        chat_id = update.effective_chat.id
+        self.user_database.delete_user(chat_id)
         answer = "Alle Daten gelöscht. Der Bot wird keine weiteren Nachrichten schicken.\n" \
                  "Falls du wieder Nachrichten erhalten möchtest, schreibe /start."
-        context.bot.send_message(chat_id=chat.id, text=answer)
+        context.bot.send_message(chat_id=chat_id, text=answer)
+
+    def cmd_help(self, update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
+        answer = "Verfügbare Kommandos:\n" \
+                 "/start\n" \
+                 "/stop\n" \
+                 "/help\n" \
+                 "/admin\n" \
+                 "/send"
+        context.bot.send_message(chat_id=chat_id, text=answer)
 
     # TODO: DEBUG ONLY
     def cmd_echo(self, update: Update, context: CallbackContext):
@@ -181,6 +192,8 @@ class TelegramShoutoutBot:
         dispatcher.add_handler(start_handler)
         stop_handler = CommandHandler('stop', self.cmd_stop)
         dispatcher.add_handler(stop_handler)
+        help_handler = CommandHandler('help', self.cmd_help)
+        dispatcher.add_handler(help_handler)
         admin_handler = CommandHandler('admin', self.cmd_admin)
         dispatcher.add_handler(admin_handler)
 
