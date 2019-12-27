@@ -49,8 +49,7 @@ class User(Base):
 class Channel(Base):
     __tablename__ = "channels"
     id = Column(Integer, primary_key=True)
-    # TODO: name should be unique
-    name = Column(String)
+    name = Column(String, unique=True)
     description = Column(String)
     default = Column(Boolean, default=False)
 
@@ -63,7 +62,7 @@ class MyDatabase:
     def __init__(self, filename):
         self.db_engine = create_engine('sqlite:///' + filename)
         try:
-            # TODO: Check if schema correct if already existing
+            # TODO: Check whether schema is correct if it already exists
             Base.metadata.create_all(self.db_engine)
             #print("Tables created")
         except Exception as e:
