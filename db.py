@@ -23,7 +23,7 @@ class User(Base):
     last_name = Column(String)
     time_start = Column(Integer)
     last_msg = Column(String)
-    is_admin = Column(Boolean)
+    ldap_account = Column(String)
 
     channels = relationship('Channel',
                             collection_class=attribute_mapped_collection('name'),

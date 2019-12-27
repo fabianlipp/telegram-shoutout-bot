@@ -9,6 +9,7 @@ from telegram.ext import MessageHandler, Filters
 
 from telegram_shoutout_bot_conf import BotConf
 import db
+import bot_ldap
 from senddata import SendData
 
 import logging
@@ -31,6 +32,7 @@ UNSUBSCRIBE_CHANNEL = range(1)
 class TelegramShoutoutBot:
     user_database = None  # type: db.UserDatabase
     channel_database = None  # type: db.ChannelDatabase
+    ldap_access = None  # type: bot_ldap.LdapAccess
 
     def cmd_start(self, update: Update, context: CallbackContext):
         chat = update.effective_chat
@@ -61,13 +63,18 @@ class TelegramShoutoutBot:
         context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
 
     def cmd_admin(self, update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
         user = self.user_database.get_by_chat_id(update.effective_chat.id)
-        if user.is_admin:
-            answer = "Du bist Admin."
+        if user.ldap_account is None:
+            answer = "Du hast keinen DPSG-Account mit deinem Telegram-Zugang verbunden."
+        elif self.ldap_access.check_usergroup(user.ldap_account):
+            answer = "Du hast einen DPSG-Account mit deinem Telegram-Zugang verbunden " \
+                     "und hast Admin-Rechte in Telegram."
         else:
-            answer = "Du bist derzeit kein Admin.\n" \
-                     "Wende dich mit deiner Chat ID {0} ans Webteam.".format(update.effective_chat.id)
-        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+            answer = "Du hast einen DPSG-Account mit deinem Telegram-Zugang verbunden," \
+                     "hast aber noch keine Admin-Rechte in Telegram.\n" \
+                     "Wende dich mit deiner Chat-ID {0} ans Webteam um Admin-Rechte zu erhalten.".format(chat_id)
+        context.bot.send_message(chat_id=chat_id, text=answer)
 
     # Starting here: Functions for conv_send_handler
     def cmd_send(self, update: Update, context: CallbackContext):
@@ -256,6 +263,9 @@ class TelegramShoutoutBot:
         my_database = db.MyDatabase(BotConf.database_file)
         self.user_database = db.UserDatabase(my_database)
         self.channel_database = db.ChannelDatabase(my_database)
+
+        self.ldap_access = bot_ldap.LdapAccess(BotConf.ldap_server, BotConf.ldap_user,
+                                               BotConf.ldap_password, BotConf.ldap_base_group_filter)
 
         # recommended values for production: 29/1017
         q = mq.MessageQueue(all_burst_limit=3, all_time_limit_ms=3000)
