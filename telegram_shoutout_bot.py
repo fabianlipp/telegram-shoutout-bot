@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 import telegram.bot
-from telegram import Message
+from telegram import Message, ParseMode
 from telegram import Update
 from telegram.ext import messagequeue as mq
 from telegram.ext import Updater, ConversationHandler, CallbackContext
@@ -79,14 +79,19 @@ class TelegramShoutoutBot:
         send_data = context.user_data["send"]  # type: SendData
         if send_data.messages is None:
             send_data.messages = []
-        send_data.messages.append(update.message)
-        answer = "Weitere Nachrichten anfügen, abschließen mit /done oder Abbrechen mit /cancel."
-        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+        if self.message_valid(update.message):
+            send_data.messages.append(update.message)
+            answer = "Weitere Nachrichten anfügen, abschließen mit /done oder Abbrechen mit /cancel."
+            context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+        else:
+            answer = "Dieses Nachrichtenformat wird nicht unterstützt.\n" \
+                     "Bitte neue Nachricht eingeben."
+            context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         # no return statement (stay in same state)
 
     def answer_done(self, update: Update, context: CallbackContext):
         send_data = context.user_data["send"]  # type: SendData
-        if send_data.messages is None or len(send_data.messages) <= 1:
+        if send_data.messages is None or len(send_data.messages) < 1:
             answer = "Bitte mindestens eine Nachricht eingeben oder Abbrechen mit /cancel."
             context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
             return None
@@ -94,12 +99,8 @@ class TelegramShoutoutBot:
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         answer = "Kanalname: {0}".format(send_data.channel)
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
-        # TODO Muss hier die verschiedenen Nachrichten-Typen unterscheiden (Bilder usw.)
-        #  Ggf. auch schon beim Speichern der Nachrichten in answer_message beachten
-        #  https://github.com/91DarioDev/ForwardsCoverBot
         for message in send_data.messages:  # type: Message
-            #context.bot.send_message(chat_id=update.effective_chat.id, text=message.text)
-            context.bot.forward_message(update.effective_chat.id, message.chat_id, message.message_id)
+            self.resend_message(update.effective_chat.id, message, context)
         answer = "Versand bestätigen mit /confirm oder Abbrechen mit /cancel."
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         return CONFIRMATION
@@ -110,7 +111,7 @@ class TelegramShoutoutBot:
         for user in self.user_database.users.values():
             if channel in user.channels:
                 for message in send_data.messages:
-                    context.bot.send_message(chat_id=user.chat_id, text=message.text)
+                    self.resend_message(user.chat_id, message, context)
         return ConversationHandler.END
 
     def answer_await_confirm(self, update: Update, context: CallbackContext):
@@ -126,6 +127,37 @@ class TelegramShoutoutBot:
     def error(self, update: Update, context: CallbackContext):
         """Log Errors caused by Updates."""
         logger.warning('Update "%s" caused error "%s"', update, context.error)
+
+    @staticmethod
+    def message_valid(message: Message):
+        if message.text or message.photo or message.sticker:
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def resend_message(chat_id, message: Message, context: CallbackContext):
+        # The following case distinction is similar to the one in
+        # https://github.com/91DarioDev/forwardscoverbot/blob/master/forwardscoverbot/messages.py
+        if message.text:
+            context.bot.send_message(
+                chat_id=chat_id,
+                text=message.text_html,
+                parse_mode=ParseMode.HTML)
+        elif message.photo:
+            media = message.photo[-1].file_id
+            context.bot.send_photo(
+                chat_id=chat_id,
+                photo=media,
+                parse_mode=ParseMode.HTML
+            )
+        elif message.sticker:
+            media = message.sticker.file_id
+            context.bot.send_sticker(
+                chat_id=chat_id,
+                sticker=media
+            )
+        # Not handled so far: voice, document, audio, video, contact, venue, location, video_note, game
 
     def __init__(self):
         from telegram.utils.request import Request
@@ -196,6 +228,15 @@ class MQBot(telegram.bot.Bot):
         """Wrapped method would accept new `queued` and `isgroup`
         OPTIONAL arguments"""
         return super(MQBot, self).send_message(*args, **kwargs)
+
+    @mq.queuedmessage
+    def send_photo(self, *args, **kwargs):
+        return super(MQBot, self).send_photo(*args, **kwargs)
+
+    @mq.queuedmessage
+    def send_sticker(self, *args, **kwargs):
+        return super(MQBot, self).send_sticker(*args, **kwargs)
+
 
 
 if __name__ == '__main__':
