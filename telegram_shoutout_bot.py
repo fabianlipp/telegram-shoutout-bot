@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 # States for send conversation
 CHANNEL, MESSAGE, CONFIRMATION = range(3)
+SUBSCRIBE_CHANNEL = range(1)
+UNSUBSCRIBE_CHANNEL = range(1)
+
 
 # TODO: Implement /help and /settings (standard commands according to Telegram documentation)
 # TODO: Not checking for admin permissions in the required places so far
@@ -48,7 +51,9 @@ class TelegramShoutoutBot:
                  "/stop\n" \
                  "/help\n" \
                  "/admin\n" \
-                 "/send"
+                 "/send\n" \
+                 "/subscribe\n" \
+                 "/unsubscribe\n"
         context.bot.send_message(chat_id=chat_id, text=answer)
 
     # TODO: DEBUG ONLY
@@ -67,11 +72,7 @@ class TelegramShoutoutBot:
     # Starting here: Functions for conv_send_handler
     def cmd_send(self, update: Update, context: CallbackContext):
         answer = "Kanal eingeben, an den die Nachricht gesendet werden soll.\n" \
-                 "Verfügbare Kanäle:"
-        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
-        answer = ""
-        for channelId, channel in self.channel_database.channels.items():
-            answer += "{0} - {1}\n".format(channel.name, channel.description)
+                 "Verfügbare Kanäle:\n" + self.get_all_channel_list()
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         return CHANNEL
 
@@ -104,22 +105,25 @@ class TelegramShoutoutBot:
         # no return statement (stay in same state)
 
     def answer_done(self, update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
         send_data = context.user_data["send"]  # type: SendData
         if send_data.messages is None or len(send_data.messages) < 1:
             answer = "Bitte mindestens eine Nachricht eingeben oder Abbrechen mit /cancel."
-            context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+            context.bot.send_message(chat_id=chat_id, text=answer)
             return None
         answer = "Diese Daten sind gespeichert:"
-        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+        context.bot.send_message(chat_id=chat_id, text=answer)
         answer = "Kanalname: {0}".format(send_data.channel)
-        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+        context.bot.send_message(chat_id=chat_id, text=answer)
         for message in send_data.messages:  # type: Message
             self.resend_message(update.effective_chat.id, message, context)
         answer = "Versand bestätigen mit /confirm oder Abbrechen mit /cancel."
-        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+        context.bot.send_message(chat_id=chat_id, text=answer)
         return CONFIRMATION
 
     def answer_confirm(self, update: Update, context: CallbackContext):
+        answer = "Nachricht wird versendet."
+        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         send_data = context.user_data["send"]  # type: SendData
         channel = send_data.channel
         for user in self.user_database.users.values():
@@ -136,6 +140,66 @@ class TelegramShoutoutBot:
     def cancel_send(self, update: Update, context: CallbackContext):
         context.user_data["send"] = None
         context.bot.send_message(chat_id=update.effective_chat.id, text="Nachrichtenversand abgebrochen.")
+        return ConversationHandler.END
+
+    # Starting here: Functions for conv_subscribe_handler
+    def cmd_subscribe(self, update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
+        answer = "Kanal eingeben, der abonniert werden soll.\n" \
+                 "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(chat_id) + \
+                 "Alle verfügbaren Kanäle:\n" + self.get_all_channel_list()
+        context.bot.send_message(chat_id=chat_id, text=answer)
+        return SUBSCRIBE_CHANNEL
+
+    def answer_subscribe_channel(self, update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
+        channel_name = update.message.text
+        if channel_name in self.channel_database.channels_by_name:
+            self.user_database.add_channel(chat_id, channel_name)
+            answer = "Kanal abonniert: " + channel_name
+            context.bot.send_message(chat_id=chat_id, text=answer)
+            return ConversationHandler.END
+        else:
+            answer = "Kanal nicht vorhanden. Bitte anderen Kanal eingeben."
+            context.bot.send_message(chat_id=chat_id, text=answer)
+            # no return statement (stay in same state)
+
+    def cancel_subscribe(self, update: Update, context: CallbackContext):
+        answer = "Subscribe abgebrochen."
+        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+        return ConversationHandler.END
+
+    # Starting here: Functions for conv_unsubscribe_handler
+    def cmd_unsubscribe(self, update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
+        answer = "Kanal eingeben, der deabonniert werden soll.\n" \
+                 "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(chat_id)
+        context.bot.send_message(chat_id=chat_id, text=answer)
+        return UNSUBSCRIBE_CHANNEL
+
+    def answer_unsubscribe_channel(self, update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
+        channel_name = update.message.text
+        user = self.user_database.get_by_chat_id(chat_id)
+        if channel_name not in self.channel_database.channels_by_name:
+            answer = "Kanal nicht vorhanden." \
+                     "Bitte anderen Kanal eingeben oder Abbrechen mit /cancel."
+            context.bot.send_message(chat_id=chat_id, text=answer)
+            # no return statement (stay in same state)
+        elif channel_name not in user.channels:
+            answer = "Kanal nicht abonniert." \
+                     "Bitte anderen Kanal eingeben oder Abbrechen mit /cancel."
+            context.bot.send_message(chat_id=chat_id, text=answer)
+            # no return statement (stay in same state)
+        else:
+            self.user_database.remove_channel(chat_id, channel_name)
+            answer = "Kanal deabonniert: " + channel_name
+            context.bot.send_message(chat_id=chat_id, text=answer)
+            return ConversationHandler.END
+
+    def cancel_unsubscribe(self, update: Update, context: CallbackContext):
+        answer = "Unsubscribe abgebrochen."
+        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         return ConversationHandler.END
 
     def error(self, update: Update, context: CallbackContext):
@@ -172,6 +236,19 @@ class TelegramShoutoutBot:
                 sticker=media
             )
         # Not handled so far: voice, document, audio, video, contact, venue, location, video_note, game
+
+    def get_all_channel_list(self) -> str:
+        answer = ""
+        for channelId, channel in self.channel_database.channels.items():
+            answer += "{0} - {1}\n".format(channel.name, channel.description)
+        return answer
+
+    def get_subscribed_channel_list(self, chat_id) -> str:
+        answer = ""
+        user = self.user_database.get_by_chat_id(chat_id)
+        for channel in user.channels.values():
+            answer += "{0} - {1}\n".format(channel.name, channel.description)
+        return answer
 
     def __init__(self):
         from telegram.utils.request import Request
@@ -214,6 +291,26 @@ class TelegramShoutoutBot:
             fallbacks=[send_cancel_handler]
         )
         dispatcher.add_handler(conv_send_handler)
+
+        subscribe_cancel_handler = CommandHandler('cancel', self.cancel_subscribe)
+        conv_subscribe_handler = ConversationHandler(
+            entry_points=[CommandHandler('subscribe', self.cmd_subscribe)],
+            states={
+                SUBSCRIBE_CHANNEL: [MessageHandler(Filters.text, self.answer_subscribe_channel)]
+            },
+            fallbacks=[subscribe_cancel_handler]
+        )
+        dispatcher.add_handler(conv_subscribe_handler)
+
+        unsubscribe_cancel_handler = CommandHandler('cancel', self.cancel_unsubscribe)
+        conv_unsubscribe_handler = ConversationHandler(
+            entry_points=[CommandHandler('unsubscribe', self.cmd_unsubscribe)],
+            states={
+                UNSUBSCRIBE_CHANNEL: [MessageHandler(Filters.text, self.answer_unsubscribe_channel)]
+            },
+            fallbacks=[unsubscribe_cancel_handler]
+        )
+        dispatcher.add_handler(conv_unsubscribe_handler)
 
         #echo_handler = MessageHandler(Filters.text, self.cmd_echo)
         #dispatcher.add_handler(echo_handler)

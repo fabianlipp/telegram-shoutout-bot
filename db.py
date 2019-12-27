@@ -28,7 +28,7 @@ class User(Base):
     channels = relationship('Channel',
                             collection_class=attribute_mapped_collection('name'),
                             secondary=user_channels,
-                            back_populates='users')
+                            back_populates='users')  # type: dict
 
     def __init__(self, chat_id, username, first_name, last_name, time_start=None):
         self.chat_id = chat_id
@@ -49,6 +49,7 @@ class User(Base):
 class Channel(Base):
     __tablename__ = "channels"
     id = Column(Integer, primary_key=True)
+    # TODO: name should be unique
     name = Column(String)
     description = Column(String)
     default = Column(Boolean, default=False)
@@ -104,8 +105,24 @@ class UserDatabase:
         session.commit()
         session.close()
 
-    def get_by_chat_id(self, chat_id):
+    def get_by_chat_id(self, chat_id) -> User:
         return self.users.get(chat_id, None)
+
+    def add_channel(self, chat_id, channel_name):
+        session = self.db.get_session()
+        user = session.query(User).filter(User.chat_id.is_(chat_id)).one()
+        channel = session.query(Channel).filter(Channel.name.is_(channel_name)).one()
+        user.channels[channel_name] = channel
+        session.commit()
+        session.close()
+
+    def remove_channel(self, chat_id, channel_name):
+        session = self.db.get_session()
+        user = session.query(User).filter(User.chat_id.is_(chat_id)).one()
+        del user.channels[channel_name]
+        session.commit()
+        session.close()
+
 
 
 class ChannelDatabase:
