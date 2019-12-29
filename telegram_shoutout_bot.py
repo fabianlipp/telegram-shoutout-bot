@@ -30,9 +30,9 @@ SEND_CHANNEL, SEND_MESSAGE, SEND_CONFIRMATION, SUBSCRIBE_CHANNEL, UNSUBSCRIBE_CH
 # TODO: Exception Handling (e.g., for database queries)
 # TODO: Answer text messages sent without an active Conversation
 # TODO: Handle /cancel command without running conversation context
-# TODO: Configure database to also delete connections to channel when deleting a user
 # TODO: Handle errors when non-existing users (after /stop) run commands (missing answers from SQL)
 # TODO: Make channel names case-insensitive
+# TODO: Show channel name above sent messages
 
 
 class TelegramShoutoutBot:
@@ -84,7 +84,7 @@ class TelegramShoutoutBot:
 
     def cmd_register(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
-        # TODO
+        # TODO: Generate token in DB
         context.bot.send_message(chat_id=chat_id, text="Not implemented")
 
     def cmd_unregister(self, update: Update, context: CallbackContext):

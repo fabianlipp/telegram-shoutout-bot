@@ -1,18 +1,19 @@
 import time
 from contextlib import contextmanager
 
-from sqlalchemy import Table, Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Table, Column, Integer, String, Boolean, ForeignKey, event, create_engine
+import sqlalchemy.engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, selectinload, Session  # , scoped_session
-from sqlalchemy import create_engine
 from sqlalchemy.orm.collections import attribute_mapped_collection
+
+from sqlite3 import Connection as SQLite3Connection
 
 Base = declarative_base()
 
-
 user_channels = Table('user_channels', Base.metadata,
-                      Column('chat_id', ForeignKey('users.chat_id'), primary_key=True),
-                      Column('channel_id', ForeignKey('channels.id'), primary_key=True)
+                      Column('chat_id', ForeignKey('users.chat_id', ondelete='CASCADE'), primary_key=True),
+                      Column('channel_id', ForeignKey('channels.id', ondelete='CASCADE'), primary_key=True)
                       )
 
 
@@ -29,7 +30,8 @@ class User(Base):
     channels = relationship('Channel',
                             collection_class=attribute_mapped_collection('name'),
                             secondary=user_channels,
-                            back_populates='users')  # type: dict
+                            back_populates='users',
+                            cascade='all, delete')  # type: dict
 
     def __init__(self, chat_id, username, first_name, last_name, time_start=None):
         self.chat_id = chat_id
@@ -56,7 +58,10 @@ class Channel(Base):
     default = Column(Boolean, default=False)
     ldap_filter = Column(String)
 
-    users = relationship('User', secondary=user_channels, back_populates='channels')
+    users = relationship('User',
+                         secondary=user_channels,
+                         back_populates='channels',
+                         cascade='all, delete')
 
 
 class MyDatabaseSession:
@@ -114,7 +119,7 @@ class MyDatabase:
     db_engine = None
 
     def __init__(self, filename):
-        self.db_engine = create_engine('sqlite:///' + filename)
+        self.db_engine = create_engine('sqlite:///' + filename, echo=True)
         try:
             # TODO: Check whether schema is correct if it already exists
             Base.metadata.create_all(self.db_engine)
@@ -140,3 +145,11 @@ def my_session_scope(db: MyDatabase):
         raise
     finally:
         session.close()
+
+
+@event.listens_for(sqlalchemy.engine.Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, SQLite3Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON;")
+        cursor.close()
