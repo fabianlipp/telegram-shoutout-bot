@@ -22,18 +22,17 @@ logger = logging.getLogger(__name__)
 # TODO: Log all (admin) queries
 # TODO: Improve error logging
 
-# States for send conversation
-CHANNEL, MESSAGE, CONFIRMATION = range(3)
-SUBSCRIBE_CHANNEL = range(1)
-UNSUBSCRIBE_CHANNEL = range(1)
-
+# States for conversation
+SEND_CHANNEL, SEND_MESSAGE, SEND_CONFIRMATION, SUBSCRIBE_CHANNEL, UNSUBSCRIBE_CHANNEL = range(5)
 
 # TODO: Implement /help and /settings (standard commands according to Telegram documentation)
 # TODO: Not checking for admin permissions in the required places so far: /send
 # TODO: Exception Handling (e.g., for database queries)
 # TODO: Answer text messages sent without an active Conversation
 # TODO: Handle /cancel command without running conversation context
-# TODO: Can start multiple Conversations at the moment. Maybe use nested conversations as solution
+# TODO: Configure database to also delete connections to channel when deleting a user
+# TODO: Handle errors when non-existing users (after /stop) run commands (missing answers from SQL)
+# TODO: Make channel names case-insensitive
 
 
 class TelegramShoutoutBot:
@@ -103,7 +102,7 @@ class TelegramShoutoutBot:
                 answer = "Kanal eingeben, an den die Nachricht gesendet werden soll.\n" \
                          "Verfügbare Kanäle:\n" + self.get_all_channel_list(session)
                 context.bot.send_message(chat_id=chat_id, text=answer)
-                return CHANNEL
+                return SEND_CHANNEL
             else:
                 answer = "Du hast keine Admin-Rechte um Nachrichten zu verschicken."
                 context.bot.send_message(chat_id=chat_id, text=answer)
@@ -126,7 +125,7 @@ class TelegramShoutoutBot:
                     send_data.channel = requested_channel
                     answer = "Nachricht eingeben, die gesendet werden soll."
                     context.bot.send_message(chat_id=chat_id, text=answer)
-                    return MESSAGE
+                    return SEND_MESSAGE
                 else:
                     answer = "Du hast keine Berechtigung an diesen Kanal zu schreiben."
                     context.bot.send_message(chat_id=chat_id, text=answer)
@@ -161,7 +160,7 @@ class TelegramShoutoutBot:
             self.resend_message(update.effective_chat.id, message, context)
         answer = "Versand bestätigen mit /confirm oder Abbrechen mit /cancel."
         context.bot.send_message(chat_id=chat_id, text=answer)
-        return CONFIRMATION
+        return SEND_CONFIRMATION
 
     def answer_confirm(self, update: Update, context: CallbackContext):
         answer = "Nachricht wird versendet."
@@ -189,13 +188,14 @@ class TelegramShoutoutBot:
     def cmd_subscribe(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
-            answer = "Kanal eingeben, der abonniert werden soll.\n" \
+            answer = "Kanal eingeben, der abonniert werden soll oder Abbrechen mit /cancel.\n" \
                      "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(session, chat_id) + \
                      "Alle verfügbaren Kanäle:\n" + self.get_all_channel_list(session)
             context.bot.send_message(chat_id=chat_id, text=answer)
             return SUBSCRIBE_CHANNEL
 
     def answer_subscribe_channel(self, update: Update, context: CallbackContext):
+        # TODO: Prüfe, dass Kanal noch nicht abonniert ist
         chat_id = update.effective_chat.id
         channel_name = update.message.text
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
@@ -219,7 +219,7 @@ class TelegramShoutoutBot:
     def cmd_unsubscribe(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
-            answer = "Kanal eingeben, der deabonniert werden soll.\n" \
+            answer = "Kanal eingeben, der deabonniert werden soll oder Abbrechen mit /cancel.\n" \
                      "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(session, chat_id)
             context.bot.send_message(chat_id=chat_id, text=answer)
             return UNSUBSCRIBE_CHANNEL
@@ -250,6 +250,16 @@ class TelegramShoutoutBot:
         answer = "Unsubscribe abgebrochen."
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         return ConversationHandler.END
+
+    def answer_invalid_cmd(self, update: Update, context: CallbackContext):
+        answer = "Du kannst dieses Kommando gerade nicht anwenden.\n" \
+                 "Vermutlich musst du das vorherige Kommando mit /cancel abbrechen."
+        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+
+    def answer_invalid_msg(self, update: Update, context: CallbackContext):
+        answer = "Ich verstehe diese Nachricht gerade nicht.\n" \
+                 "Benutze /help für eine Liste der vefügbaren Kommandos."
+        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
 
     def error(self, update: Update, context: CallbackContext):
         """Log Errors caused by Updates."""
@@ -315,56 +325,46 @@ class TelegramShoutoutBot:
         updater = telegram.ext.updater.Updater(bot=mqbot, use_context=True)
         dispatcher = updater.dispatcher
 
-        start_handler = CommandHandler('start', self.cmd_start)
-        dispatcher.add_handler(start_handler)
-        stop_handler = CommandHandler('stop', self.cmd_stop)
-        dispatcher.add_handler(stop_handler)
-        help_handler = CommandHandler('help', self.cmd_help)
-        dispatcher.add_handler(help_handler)
-        admin_handler = CommandHandler('admin', self.cmd_admin)
-        dispatcher.add_handler(admin_handler)
-        register_handler = CommandHandler('register', self.cmd_register)
-        dispatcher.add_handler(register_handler)
-        unregister_handler = CommandHandler('unregister', self.cmd_unregister)
-        dispatcher.add_handler(unregister_handler)
-
         send_cancel_handler = CommandHandler('cancel', self.cancel_send)
-        conv_send_handler = ConversationHandler(
-            entry_points=[CommandHandler('send', self.cmd_send)],
-            states={
-                CHANNEL: [MessageHandler(Filters.text, self.answer_channel)],
-                MESSAGE: [CommandHandler('done', self.answer_done),
-                          send_cancel_handler,
-                          # TODO More restrictive filter here?
-                          # TODO Handler for non-matched messages?
-                          MessageHandler(Filters.all & (~ Filters.command), self.answer_message)],
-                CONFIRMATION: [CommandHandler('confirm', self.answer_confirm),
-                               send_cancel_handler,
-                               MessageHandler(Filters.all, self.answer_await_confirm)]
-            },
-            fallbacks=[send_cancel_handler]
-        )
-        dispatcher.add_handler(conv_send_handler)
-
         subscribe_cancel_handler = CommandHandler('cancel', self.cancel_subscribe)
-        conv_subscribe_handler = ConversationHandler(
-            entry_points=[CommandHandler('subscribe', self.cmd_subscribe)],
-            states={
-                SUBSCRIBE_CHANNEL: [MessageHandler(Filters.text, self.answer_subscribe_channel)]
-            },
-            fallbacks=[subscribe_cancel_handler]
-        )
-        dispatcher.add_handler(conv_subscribe_handler)
-
         unsubscribe_cancel_handler = CommandHandler('cancel', self.cancel_unsubscribe)
-        conv_unsubscribe_handler = ConversationHandler(
-            entry_points=[CommandHandler('unsubscribe', self.cmd_unsubscribe)],
+
+        conversation_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler('start', self.cmd_start),
+                CommandHandler('stop', self.cmd_stop),
+                CommandHandler('help', self.cmd_help),
+                CommandHandler('admin', self.cmd_admin),
+                CommandHandler('register', self.cmd_register),
+                CommandHandler('unregister', self.cmd_unregister),
+                CommandHandler('send', self.cmd_send),
+                CommandHandler('subscribe', self.cmd_subscribe),
+                CommandHandler('unsubscribe', self.cmd_unsubscribe)
+            ],
             states={
-                UNSUBSCRIBE_CHANNEL: [MessageHandler(Filters.text, self.answer_unsubscribe_channel)]
+                SEND_CHANNEL: [MessageHandler(Filters.text, self.answer_channel)],
+                SEND_MESSAGE: [CommandHandler('done', self.answer_done),
+                               send_cancel_handler,
+                               # TODO More restrictive filter here?
+                               # TODO Handler for non-matched messages?
+                               MessageHandler(Filters.all & (~ Filters.command), self.answer_message)],
+                SEND_CONFIRMATION: [CommandHandler('confirm', self.answer_confirm),
+                                    send_cancel_handler,
+                                    MessageHandler(Filters.all, self.answer_await_confirm)],
+                SUBSCRIBE_CHANNEL: [subscribe_cancel_handler,
+                                    MessageHandler(Filters.text, self.answer_subscribe_channel)],
+                UNSUBSCRIBE_CHANNEL: [unsubscribe_cancel_handler,
+                                      MessageHandler(Filters.text, self.answer_unsubscribe_channel)]
             },
-            fallbacks=[unsubscribe_cancel_handler]
+            fallbacks=[
+            ]
         )
-        dispatcher.add_handler(conv_unsubscribe_handler)
+        dispatcher.add_handler(conversation_handler)
+
+        fallback_cmd_handler = MessageHandler(Filters.command, self.answer_invalid_cmd)
+        fallback_msg_handler = MessageHandler(Filters.all, self.answer_invalid_msg)
+        dispatcher.add_handler(fallback_cmd_handler)
+        dispatcher.add_handler(fallback_msg_handler)
 
         # log all errors
         dispatcher.add_error_handler(self.error)
