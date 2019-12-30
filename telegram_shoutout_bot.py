@@ -29,7 +29,6 @@ SEND_CHANNEL, SEND_MESSAGE, SEND_CONFIRMATION, SUBSCRIBE_CHANNEL, UNSUBSCRIBE_CH
 # TODO: Not checking for admin permissions in the required places so far: /send
 # TODO: Exception Handling (e.g., for database queries)
 # TODO: Handle errors when non-existing users (after /stop) run commands (missing answers from SQL)
-# TODO: Make channel names case-insensitive
 # TODO: Show channel name above sent messages
 
 
@@ -233,7 +232,7 @@ class TelegramShoutoutBot:
                          "Bitte anderen Kanal eingeben oder Abbrechen mit /cancel."
                 context.bot.send_message(chat_id=chat_id, text=answer)
                 # no return statement (stay in same state)
-            elif channel_name not in user.channels:
+            elif channel not in user.channels.values():
                 answer = "Kanal nicht abonniert." \
                          "Bitte anderen Kanal eingeben oder Abbrechen mit /cancel."
                 context.bot.send_message(chat_id=chat_id, text=answer)

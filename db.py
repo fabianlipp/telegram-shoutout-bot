@@ -53,7 +53,7 @@ class User(Base):
 class Channel(Base):
     __tablename__ = "channels"
     id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True)
+    name = Column(String(collation='NOCASE'), unique=True)
     description = Column(String)
     default = Column(Boolean, default=False)
     ldap_filter = Column(String)
