@@ -1,4 +1,7 @@
 #!/usr/bin/python3
+import random
+import string
+
 import telegram.bot
 from telegram import Message, ParseMode
 from telegram import Update
@@ -84,12 +87,18 @@ class TelegramShoutoutBot:
 
     def cmd_register(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
-        # TODO: Generate token in DB
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
             user = session.get_user_by_chat_id(chat_id)
             if user is None:
-                context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
-        context.bot.send_message(chat_id=chat_id, text="Not implemented")
+                answer = self.get_message_user_not_known()
+            else:
+                letters_and_digits = string.ascii_letters + string.digits
+                token = ''.join(random.choice(letters_and_digits) for i in range(20))
+                user.ldap_register_token = token
+                session.commit()
+                # TODO: Write webpage and output link here
+                answer = "Chat ID: {0}, Token: {1}".format(chat_id, token)
+        context.bot.send_message(chat_id=chat_id, text=answer)
 
     def cmd_unregister(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id

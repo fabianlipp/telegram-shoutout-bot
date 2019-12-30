@@ -26,6 +26,7 @@ class User(Base):
     time_start = Column(Integer)
     last_msg = Column(String)
     ldap_account = Column(String)
+    ldap_register_token = Column(String)
 
     channels = relationship('Channel',
                             collection_class=attribute_mapped_collection('name'),
