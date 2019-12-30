@@ -28,8 +28,6 @@ SEND_CHANNEL, SEND_MESSAGE, SEND_CONFIRMATION, SUBSCRIBE_CHANNEL, UNSUBSCRIBE_CH
 # TODO: Implement /help and /settings (standard commands according to Telegram documentation)
 # TODO: Not checking for admin permissions in the required places so far: /send
 # TODO: Exception Handling (e.g., for database queries)
-# TODO: Answer text messages sent without an active Conversation
-# TODO: Handle /cancel command without running conversation context
 # TODO: Handle errors when non-existing users (after /stop) run commands (missing answers from SQL)
 # TODO: Make channel names case-insensitive
 # TODO: Show channel name above sent messages
@@ -251,6 +249,10 @@ class TelegramShoutoutBot:
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         return ConversationHandler.END
 
+    def answer_invalid_cancel(self, update: Update, context: CallbackContext):
+        answer = "Du befindest dich bereits im Hauptmenü und kannst gerade nichts abbrechen."
+        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+
     def answer_invalid_cmd(self, update: Update, context: CallbackContext):
         answer = "Du kannst dieses Kommando gerade nicht anwenden.\n" \
                  "Vermutlich musst du das vorherige Kommando mit /cancel abbrechen."
@@ -361,8 +363,10 @@ class TelegramShoutoutBot:
         )
         dispatcher.add_handler(conversation_handler)
 
+        fallback_cancel_handler = CommandHandler('cancel', self.answer_invalid_cancel)
         fallback_cmd_handler = MessageHandler(Filters.command, self.answer_invalid_cmd)
         fallback_msg_handler = MessageHandler(Filters.all, self.answer_invalid_msg)
+        dispatcher.add_handler(fallback_cancel_handler)
         dispatcher.add_handler(fallback_cmd_handler)
         dispatcher.add_handler(fallback_msg_handler)
 
