@@ -52,15 +52,17 @@ class TelegramShoutoutBot:
     def cmd_help(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
         answer = "Verfügbare Kommandos:\n" \
-                 "/start\n" \
-                 "/stop\n" \
-                 "/help\n" \
-                 "/admin\n" \
-                 "/send\n" \
-                 "/subscribe\n" \
-                 "/unsubscribe\n" \
-                 "/register\n" \
-                 "/unregister\n"
+                 "/start - Shoutout starten.\n" \
+                 "/stop - Alle Nachrichten deaktivieren, Daten werden vom Server gelöscht.\n" \
+                 "/help - Diese Hilfenachricht anzeigen.\n" \
+                 "/subscribe - Zusätzlichen Kanal abonnieren.\n" \
+                 "/unsubscribe - Einzelnen Kanal abbestellen.\n" \
+                 "\n" \
+                 "Befehle für Administratoren\n" \
+                 "/admin - Eigenen Admin-Status anzeigen.\n" \
+                 "/register - Eigenen Account mit einem DPSG-Account verknüpfen.\n" \
+                 "/unregister - Verknüpfung zum DPSG-Account lösen.\n" \
+                 "/send - Nachricht an Abonnenten senden.\n"
         context.bot.send_message(chat_id=chat_id, text=answer)
 
     def cmd_admin(self, update: Update, context: CallbackContext):
