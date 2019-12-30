@@ -28,7 +28,6 @@ SEND_CHANNEL, SEND_MESSAGE, SEND_CONFIRMATION, SUBSCRIBE_CHANNEL, UNSUBSCRIBE_CH
 # TODO: Implement /help and /settings (standard commands according to Telegram documentation)
 # TODO: Not checking for admin permissions in the required places so far: /send
 # TODO: Exception Handling (e.g., for database queries)
-# TODO: Handle errors when non-existing users (after /stop) run commands (missing answers from SQL)
 # TODO: Show channel name above sent messages
 
 
@@ -68,7 +67,9 @@ class TelegramShoutoutBot:
         chat_id = update.effective_chat.id
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
             user = session.get_user_by_chat_id(chat_id)
-            if user.ldap_account is None:
+            if user is None:
+                answer = self.get_message_user_not_known()
+            elif user.ldap_account is None:
                 answer = "Du hast keinen DPSG-Account mit deinem Telegram-Zugang verbunden."
             elif self.ldap_access.check_usergroup(user.ldap_account):
                 answer = "Du hast einen DPSG-Account mit deinem Telegram-Zugang verbunden " \
@@ -82,20 +83,31 @@ class TelegramShoutoutBot:
     def cmd_register(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
         # TODO: Generate token in DB
+        with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
+            user = session.get_user_by_chat_id(chat_id)
+            if user is None:
+                context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
         context.bot.send_message(chat_id=chat_id, text="Not implemented")
 
     def cmd_unregister(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
-            session.remove_ldap(chat_id)
-            context.bot.send_message(chat_id=chat_id, text="Account-Zuordnung entfernt")
+            user = session.get_user_by_chat_id(chat_id)
+            if user is None:
+                context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
+            else:
+                session.remove_ldap(chat_id)
+                context.bot.send_message(chat_id=chat_id, text="Account-Zuordnung entfernt")
 
     # Starting here: Functions for conv_send_handler
     def cmd_send(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
             user = session.get_user_by_chat_id(chat_id)
-            if user.ldap_account is not None and self.ldap_access.check_usergroup(user.ldap_account):
+            if user is None:
+                context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
+                return ConversationHandler.END
+            elif user.ldap_account is not None and self.ldap_access.check_usergroup(user.ldap_account):
                 answer = "Kanal eingeben, an den die Nachricht gesendet werden soll.\n" \
                          "Verfügbare Kanäle:\n" + self.get_all_channel_list(session)
                 context.bot.send_message(chat_id=chat_id, text=answer)
@@ -111,7 +123,10 @@ class TelegramShoutoutBot:
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
             user = session.get_user_by_chat_id(chat_id)
             channel = session.get_channel_by_name(requested_channel)
-            if channel is None:
+            if user is None:
+                context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
+                return ConversationHandler.END
+            elif channel is None:
                 answer = "Kanal nicht vorhanden. Bitte anderen Kanal eingeben."
                 context.bot.send_message(chat_id=chat_id, text=answer)
                 # no return statement (stay in same state)
@@ -160,6 +175,7 @@ class TelegramShoutoutBot:
         return SEND_CONFIRMATION
 
     def answer_confirm(self, update: Update, context: CallbackContext):
+        # TODO: Verify sufficient permissions here again?
         answer = "Nachricht wird versendet."
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         send_data = context.user_data["send"]  # type: SendData
@@ -185,19 +201,28 @@ class TelegramShoutoutBot:
     def cmd_subscribe(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
-            answer = "Kanal eingeben, der abonniert werden soll oder Abbrechen mit /cancel.\n" \
-                     "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(session, chat_id) + \
-                     "Alle verfügbaren Kanäle:\n" + self.get_all_channel_list(session)
-            context.bot.send_message(chat_id=chat_id, text=answer)
-            return SUBSCRIBE_CHANNEL
+            user = session.get_user_by_chat_id(chat_id)
+            if user is None:
+                context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
+                return ConversationHandler.END
+            else:
+                answer = "Kanal eingeben, der abonniert werden soll oder Abbrechen mit /cancel.\n" \
+                         "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(session, chat_id) + \
+                         "Alle verfügbaren Kanäle:\n" + self.get_all_channel_list(session)
+                context.bot.send_message(chat_id=chat_id, text=answer)
+                return SUBSCRIBE_CHANNEL
 
     def answer_subscribe_channel(self, update: Update, context: CallbackContext):
         # TODO: Prüfe, dass Kanal noch nicht abonniert ist
         chat_id = update.effective_chat.id
         channel_name = update.message.text
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
+            user = session.get_user_by_chat_id(chat_id)
             channel = session.get_channel_by_name(channel_name)
-            if channel is not None:
+            if user is None:
+                context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
+                return ConversationHandler.END
+            elif channel is not None:
                 session.add_channel(chat_id, channel)
                 answer = "Kanal abonniert: " + channel_name
                 context.bot.send_message(chat_id=chat_id, text=answer)
@@ -216,10 +241,15 @@ class TelegramShoutoutBot:
     def cmd_unsubscribe(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
-            answer = "Kanal eingeben, der deabonniert werden soll oder Abbrechen mit /cancel.\n" \
-                     "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(session, chat_id)
-            context.bot.send_message(chat_id=chat_id, text=answer)
-            return UNSUBSCRIBE_CHANNEL
+            user = session.get_user_by_chat_id(chat_id)
+            if user is None:
+                context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
+                return ConversationHandler.END
+            else:
+                answer = "Kanal eingeben, der deabonniert werden soll oder Abbrechen mit /cancel.\n" \
+                         "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(session, chat_id)
+                context.bot.send_message(chat_id=chat_id, text=answer)
+                return UNSUBSCRIBE_CHANNEL
 
     def answer_unsubscribe_channel(self, update: Update, context: CallbackContext):
         chat_id = update.effective_chat.id
@@ -227,7 +257,10 @@ class TelegramShoutoutBot:
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
             user = session.get_user_by_chat_id(chat_id)
             channel = session.get_channel_by_name(channel_name)
-            if channel is None:
+            if user is None:
+                context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
+                return ConversationHandler.END
+            elif channel is None:
                 answer = "Kanal nicht vorhanden." \
                          "Bitte anderen Kanal eingeben oder Abbrechen mit /cancel."
                 context.bot.send_message(chat_id=chat_id, text=answer)
@@ -309,6 +342,11 @@ class TelegramShoutoutBot:
         for channel in user.channels.values():
             answer += "{0} - {1}\n".format(channel.name, channel.description)
         return answer
+
+    @staticmethod
+    def get_message_user_not_known() -> str:
+        return "Dein Account ist nicht bekannt." \
+               "Um mit dem Bot zu kommunizieren musst du zunächst /start eingeben."
 
     def __init__(self):
         from telegram.utils.request import Request
@@ -407,4 +445,3 @@ class MQBot(telegram.bot.Bot):
 
 if __name__ == '__main__':
     bot = TelegramShoutoutBot()
-
