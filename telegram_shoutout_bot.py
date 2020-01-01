@@ -1,6 +1,9 @@
 #!/usr/bin/python3
+import logging
 import random
 import string
+import sys
+import traceback
 import warnings
 from queue import Queue, Empty
 
@@ -19,13 +22,19 @@ import db
 import bot_ldap
 from senddata import SendData
 
-import logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+rootLogger = logging.getLogger('')
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+file_handler = logging.FileHandler(BotConf.log_file)
+stream_handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+stream_handler.setFormatter(formatter)
+rootLogger.addHandler(file_handler)
+rootLogger.addHandler(stream_handler)
+
 
 # TODO: Log all (admin) queries
-# TODO: Improve error logging
 
 # States for conversation
 SEND_CHANNEL, SEND_MESSAGE, SEND_CONFIRMATION, SUBSCRIBE_CHANNEL, UNSUBSCRIBE_CHANNEL = range(0, 5)
@@ -352,7 +361,38 @@ class TelegramShoutoutBot:
 
     def error(self, update: Update, context: CallbackContext):
         """Log Errors caused by Updates."""
-        logger.warning('Update "%s" caused error "%s"', update, context.error)
+        # we want to notify the user of this problem. This will always work, but not notify users if the update is an
+        # callback or inline query, or a poll update. In case you want this, keep in mind that sending the message
+        # could fail
+        if update.effective_message:
+            text = "Bei deiner Anfrage ist leider ein Fehler aufgetreten."
+            update.effective_message.reply_text(text)
+        # This traceback is created with accessing the traceback object from the sys.exc_info, which is returned as the
+        # third value of the returned tuple. Then we use the traceback.format_tb to get the traceback as a string, which
+        # for a weird reason separates the line breaks in a list, but keeps the linebreaks itself. So just joining an
+        # empty string works fine.
+        trace = "".join(traceback.format_tb(sys.exc_info()[2]))
+        # lets try to get as much information from the telegram update as possible
+        payload = ""
+        # normally, we always have an user. If not, its either a channel or a poll update.
+        if update.effective_user:
+            payload += ' with the user {0}'.format(update.effective_user.id)
+        # there are more situations when you don't get a chat
+        if update.effective_chat:
+            payload += ' within the chat <i>{0}</i>'.format(update.effective_chat.title)
+            if update.effective_chat.username:
+                payload += ' (@{0})'.format(update.effective_chat.username)
+        # but only one where you have an empty payload by now: A poll (buuuh)
+        if update.poll:
+            payload += ' with the poll id {0}.'.format(update.poll.id)
+        # lets put this in a "well" formatted text
+        text = "Hey.\n The error <code>{0}</code> happened{1}. The full traceback:\n\n<code>{2}" \
+               "</code>".format(context.error, payload, trace)
+        # and send it to the dev(s)
+        for dev_id in BotConf.bot_devs:
+            context.bot.send_message(dev_id, "An error occured in the bot and was logged.")
+        # we raise the error again, so the logger module catches it. If you don't use the logger module, use it.
+        logger.warning('Update "%s" caused error "%s".\nFull information: %s', update, context.error, text)
 
     @staticmethod
     def message_valid(message: Message):
@@ -461,7 +501,7 @@ class TelegramShoutoutBot:
                                                BotConf.ldap_password, BotConf.ldap_base_group_filter)
 
         # recommended values for production: 29/1017
-        q = mq.MessageQueue(all_burst_limit=2, all_time_limit_ms=5000)
+        q = mq.MessageQueue(all_burst_limit=29, all_time_limit_ms=1017)
         # set connection pool size for bot
         request = Request(con_pool_size=8)
         mqbot = MQBot(token=BotConf.bot_token,
