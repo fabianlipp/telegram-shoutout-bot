@@ -109,8 +109,11 @@ class MyDatabaseSession:
         user = self.session.query(User).filter(User.chat_id.is_(chat_id)).one()
         user.ldap_account = None
 
-    def get_channel_by_name(self, name):
+    def get_channel_by_name(self, name: str):
         return self.session.query(Channel).filter(Channel.name.is_(name)).first()
+
+    def get_channel_by_id(self, channel_id: int):
+        return self.session.query(Channel).filter(Channel.id.is_(channel_id)).first()
 
     def get_channels(self):
         return self.session.query(Channel).all()
@@ -120,7 +123,7 @@ class MyDatabase:
     db_engine = None
 
     def __init__(self, filename):
-        self.db_engine = create_engine('sqlite:///' + filename, echo=True)
+        self.db_engine = create_engine('sqlite:///' + filename, echo=False)
         try:
             # TODO: Check whether schema is correct if it already exists
             Base.metadata.create_all(self.db_engine)
