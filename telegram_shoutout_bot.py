@@ -22,7 +22,7 @@ import db
 import bot_ldap
 from senddata import SendData
 
-rootLogger = logging.getLogger('')
+# Logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 file_handler = logging.FileHandler(BotConf.log_file)
@@ -30,11 +30,14 @@ stream_handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 stream_handler.setFormatter(formatter)
-rootLogger.addHandler(file_handler)
-rootLogger.addHandler(stream_handler)
-
-
-# TODO: Log all (admin) queries
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
+# Log for admin actions
+adminLogger = logging.getLogger('TelegramShoutoutBot.admin')
+adminLogger.setLevel(logging.INFO)
+admin_file_handler = logging.FileHandler(BotConf.admin_log)
+admin_file_handler.setFormatter(formatter)
+adminLogger.addHandler(admin_file_handler)
 
 # States for conversation
 SEND_CHANNEL, SEND_MESSAGE, SEND_CONFIRMATION, SUBSCRIBE_CHANNEL, UNSUBSCRIBE_CHANNEL = range(0, 5)
@@ -237,10 +240,15 @@ class TelegramShoutoutBot:
     def answer_confirm(self, update: Update, context: CallbackContext):
         # TODO: Verify sufficient permissions here again?
         self.remove_all_inline_keyboards(update, context)
+        chat = update.effective_chat
         answer = "Nachricht wird versendet."
-        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+        context.bot.send_message(chat_id=chat.id, text=answer)
         send_data = context.user_data["send"]  # type: SendData
         channel_name = send_data.channel
+        log_messages_strings = list(map(lambda msg: msg.__dict__, send_data.messages))
+        log_message_format = "Sent message by user {0} ({1}, {2} {3}) to channel {4}: {5}"
+        adminLogger.info(log_message_format.format(chat.id, chat.username, chat.first_name,
+                                                   chat.last_name, channel_name, log_messages_strings))
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
             for user in session.get_users():
                 if channel_name in user.channels:
