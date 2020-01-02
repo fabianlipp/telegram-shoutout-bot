@@ -179,7 +179,8 @@ class TelegramShoutoutBot:
                 context.bot.send_message(chat_id=chat_id, text=answer)
                 # no return statement (stay in same state)
             else:
-                # TODO: Handle case, when there is no LDAP filter defined for this channel
+                if channel.ldap_filter is None or len(channel.ldap_filter) == 0:
+                    logger.warning("No LDAP filter configured for channel {0}. Denying access.".format(channel.name))
                 if self.ldap_access.check_filter(user.ldap_account, channel.ldap_filter):
                     send_data = SendData()
                     context.user_data["send"] = send_data

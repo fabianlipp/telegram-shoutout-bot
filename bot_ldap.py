@@ -17,7 +17,9 @@ class LdapAccess:
     def check_usergroup(self, username) -> bool:
         return self.check_filter(username, self.base_group_filter)
 
-    def check_filter(self, username, filter) -> bool:
+    def check_filter(self, username, ldap_filter) -> bool:
+        if ldap_filter is None:
+            return False
         # Use the username as base to decide whether it belongs to group
-        self.conn.search(username, filter)
+        self.conn.search(username, ldap_filter)
         return len(self.conn.response) == 1
