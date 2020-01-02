@@ -48,7 +48,6 @@ CB_CHANNEL_PREFIX = 'CH'
 CB_CHANNEL_REGEX = r"^" + CB_CHANNEL_PREFIX + r"(\d+)"
 
 # TODO: Implement /help and /settings (standard commands according to Telegram documentation)
-# TODO: Not checking for admin permissions in the required places so far: /send
 # TODO: Exception Handling (e.g., for database queries)
 # TODO: Show channel name above sent messages
 # TODO: Persistence for conversations (including keyboad_message_queue/list)
@@ -239,7 +238,6 @@ class TelegramShoutoutBot:
         return SEND_CONFIRMATION
 
     def answer_confirm(self, update: Update, context: CallbackContext):
-        # TODO: Verify sufficient permissions here again?
         self.remove_all_inline_keyboards(update, context)
         chat = update.effective_chat
         answer = "Nachricht wird versendet."
@@ -251,6 +249,16 @@ class TelegramShoutoutBot:
         adminLogger.info(log_message_format.format(chat.id, chat.username, chat.first_name,
                                                    chat.last_name, channel_name, log_messages_strings))
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
+            # Verify permissions again to be safe (the conversation could be running for longer)
+            user = session.get_user_by_chat_id(chat.id)
+            channel = session.get_channel_by_name(channel_name)
+            if user is None or user.ldap_account is None or not self.ldap_access.check_usergroup(user.ldap_account) or \
+               not self.ldap_access.check_filter(user.ldap_account, channel.ldap_filter):
+                adminLogger.warning("Stopped message sending because of insufficient permissions.")
+                answer = "Du hast keine Berechtigung zum Nachrichtenversand."
+                context.bot.send_message(chat_id=chat.id, text=answer)
+                return ConversationHandler.END
+            # Send message out to users
             for user in session.get_users():
                 if channel_name in user.channels:
                     for message in send_data.messages:
