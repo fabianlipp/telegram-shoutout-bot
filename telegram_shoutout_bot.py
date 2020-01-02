@@ -290,7 +290,6 @@ class TelegramShoutoutBot:
                 return SUBSCRIBE_CHANNEL
 
     def answer_subscribe_channel(self, update: Update, context: CallbackContext):
-        # TODO: Prüfe, dass Kanal noch nicht abonniert ist
         self.remove_all_inline_keyboards(update, context)
         chat_id = update.effective_chat.id
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
@@ -298,6 +297,10 @@ class TelegramShoutoutBot:
             channel = self.get_channel_from_update(session, update, context)
             if user is None:
                 context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
+                return ConversationHandler.END
+            elif channel.name in user.channels:
+                answer = "Du hast diesen Kanal bereits abonniert."
+                context.bot.send_message(chat_id=chat_id, text=answer)
                 return ConversationHandler.END
             elif channel is not None:
                 session.add_channel(chat_id, channel)
@@ -555,8 +558,6 @@ class TelegramShoutoutBot:
                                    CallbackQueryHandler(pattern=CB_SEND_CANCEL, callback=self.cancel_send),
                                    CommandHandler('done', self.answer_done),
                                    send_cancel_handler,
-                                   # TODO More restrictive filter here?
-                                   # TODO Handler for non-matched messages?
                                    MessageHandler(Filters.all & (~ Filters.command), self.answer_message)],
                     SEND_CONFIRMATION: [CallbackQueryHandler(pattern=CB_SEND_CONFIRM, callback=self.answer_confirm),
                                         CallbackQueryHandler(pattern=CB_SEND_CANCEL, callback=self.cancel_send),
