@@ -1,0 +1,10 @@
+class BotConf:
+    bot_token = '123456789:shiec2nai3joy3alee7ohduz3eiH5nahb7yu'
+    database_file = '/.../testdb.sqlite'
+    ldap_base_group_filter = "(&(objectclass=person)(memberOf=cn=telegram,ou=group,dc=example,dc=com))"
+    ldap_server = 'ldaps://example.com'
+    ldap_user = "userid=telegram,ou=user,dc=example,dc=com"
+    ldap_password = ""
+    log_file = '/.../error.log'
+    admin_log = '/.../admin.log'
+    bot_devs = [123456789]
