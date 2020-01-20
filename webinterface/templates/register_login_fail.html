@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+Registration failed.
+{% if reason == "ldap" %}
+Deine Zugangsdaten sind ungültig.
+{% elif reason == "chat_id" %}
+Die übergebene chat_id ist ungültig.
+{% elif reason == "token" %}
+Der übergebene token ist ungültig.
+{% else %}
+Unbekannter Grund.
+{% endif %}
+{% endblock %}

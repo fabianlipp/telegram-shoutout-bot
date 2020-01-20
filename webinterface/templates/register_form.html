@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+Welcome to registration, chat_id={{ chat_id }}, token={{ token }}
+<form action="/register/{{ chat_id }}/login" method="post">
+    <input type="hidden" name="token" value="{{ token }}" />
+    <input type="text" name="username" value="" />
+    <input type="password" name="password" value="" />
+    <input type="submit" name="login" value="Login">
+</form>
+{% endblock %}

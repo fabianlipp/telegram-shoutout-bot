@@ -1,4 +1,4 @@
-from ldap3 import Server, Connection, RESTARTABLE
+from ldap3 import Server, Connection, RESTARTABLE, SYNC
 
 
 class LdapAccess:
@@ -6,8 +6,8 @@ class LdapAccess:
 
     def __init__(self, server_url, user, password, base_group_filter):
         self.base_group_filter = base_group_filter
-        server = Server(server_url)
-        conn = Connection(server,
+        self.server = Server(server_url)
+        conn = Connection(self.server,
                           user=user,
                           password=password,
                           client_strategy=RESTARTABLE)
@@ -23,3 +23,12 @@ class LdapAccess:
         # Use the username as base to decide whether it belongs to group
         self.conn.search(username, ldap_filter)
         return len(self.conn.response) == 1
+
+    def check_credentials(self, username, password) -> bool:
+        credential_conn = Connection(self.server,
+                                     user=username,
+                                     password=password,
+                                     client_strategy=SYNC)
+        ret = credential_conn.bind()
+        credential_conn.unbind()
+        return ret
