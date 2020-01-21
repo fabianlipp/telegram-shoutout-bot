@@ -1,0 +1,1 @@
+from webinterface import app as application
