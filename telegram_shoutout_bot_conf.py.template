@@ -5,6 +5,7 @@ class BotConf:
     ldap_server = 'ldaps://example.com'
     ldap_user = "userid=telegram,ou=user,dc=example,dc=com"
     ldap_password = ""
+    ldap_username_template = "cn={0},ou=People,dc=example,dc=com"
     log_file = '/.../error.log'
     admin_log = '/.../admin.log'
     bot_devs = [123456789]
