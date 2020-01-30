@@ -2,8 +2,138 @@
 <html>
     <head>
         <title>Telegram User Registration</title>
+        <style>
+			a {
+				color: #007bff;
+			}
+			body {
+				font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+			}
+            button, input {
+                overflow: visible;
+            }
+            .alert {
+                position: relative;
+                padding: .75rem 1.25rem;
+                margin-bottom: 1rem;
+                border: 1px solid transparent;
+                border-radius: .25rem;
+            }
+            .alert-link {
+                font-weight: 700;
+				text-decoration: none;
+            }
+            .alert-danger {
+                color: #721c24;
+                background-color: #f8d7da;
+                border-color: #f5c6cb;
+            }.
+			.alert-danger .alert-link  {
+				color: #491217;
+			}
+            .alert-success {
+                color: #155724;
+                background-color: #d4edda;
+                border-color: #c3e6cb;
+            }
+			.alert-success .alert-link {
+				color: #0b2e13;
+			}
+            .btn {
+                display: inline-block;
+                font-weight: 400;
+                text-align: center;
+                white-space: nowrap;
+                vertical-align: middle;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+                border: 1px solid transparent;
+                padding: .375rem .75rem;
+                font-size: 1rem;
+                line-height: 1.5;
+                border-radius: .25rem;
+                transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+            }
+            .btn:not(:disabled):not(.disabled) {
+                cursor: pointer;
+            }
+            .btn-primary {
+                color: #fff;
+                background-color: #007bff;
+                border-color: #007bff;
+            }
+            .container {
+                width: 100%;
+                padding-right: 15px;
+                padding-left: 15px;
+                margin-right: auto;
+                margin-left: auto;
+            }
+            @media (min-width: 576px) {
+                .container {
+                    max-width: 540px;
+                }
+            }
+            @media (min-width: 768px) {
+                .container {
+                    max-width: 720px;
+                }
+            }
+            .form-control {
+                display: block;
+                width: 100%;
+                padding: .375rem .75rem;
+                font-size: 1rem;
+                line-height: 1.5;
+                color: #495057;
+                background-color: #fff;
+                background-clip: padding-box;
+                border: 1px solid #ced4da;
+                border-radius: .25rem;
+                transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+            }
+            .input-group {
+                position: relative;
+                display: -webkit-box;
+                display: -ms-flexbox;
+                display: flex;
+                -ms-flex-wrap: wrap;
+                flex-wrap: wrap;
+                -webkit-box-align: stretch;
+                -ms-flex-align: stretch;
+                align-items: stretch;
+                width: 100%;
+            }
+            .input-group>.form-control {
+                position: relative;
+                -webkit-box-flex: 1;
+                -ms-flex: 1 1 auto;
+                flex: 1 1 auto;
+                width: 1%;
+                margin-bottom: 0;
+            }
+            .input-group>.form-control:not(:first-child), .input-group>.input-group-append>.btn {
+                border-top-left-radius: 0;
+                border-bottom-left-radius: 0;
+            }
+            .input-group>.form-control:not(:last-child) {
+                border-top-right-radius: 0;
+                border-bottom-right-radius: 0;
+            }
+            .input-group-append .btn, .input-group-prepend .btn {
+                position: relative;
+                z-index: 2;
+            }
+            .text-muted {
+                color: #6c757d !important;
+            }
+        </style>
     </head>
     <body>
+        <div class="container">
         {% block content %}{% endblock %}
+        </div>
     </body>
 </html>

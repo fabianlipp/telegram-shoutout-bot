@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-Registration failed.
+<div class="alert alert-danger"><b>Registrierung fehlgeschlagen</b>
 {% if reason == "ldap" %}
 Deine Zugangsdaten sind ungültig.
 {% elif reason == "chat_id" %}
-Die übergebene chat_id ist ungültig.
+Die übergebene <i>chat_id</i> ist ungültig.
 {% elif reason == "token" %}
-Der übergebene token ist ungültig.
+Der übergebene <i>token</i> ist ungültig.
 {% else %}
 Unbekannter Grund.
 {% endif %}
+<a class="alert-link" href="{{ url_path }}register/{{ chat_id }}?token={{ token }}">Erneut versuchen</a></div>
 {% endblock %}
