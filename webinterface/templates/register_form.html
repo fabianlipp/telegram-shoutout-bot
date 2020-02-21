@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Telegram Bot Registrierung</h1>
-<form action="{{ url_path }}register/{{ chat_id }}/login" method="post">
+<form action="{{ g.url_path }}register/{{ chat_id }}/login" method="post">
     <input type="hidden" name="token" value="{{ token }}">
 	<div class="input-group">
 		<input type="text" class="form-control" name="username" value="">
