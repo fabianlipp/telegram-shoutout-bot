@@ -8,6 +8,7 @@ class BotConf:
     ldap_username_template = "cn={0},ou=People,dc=example,dc=com"
     log_file = '/.../error.log'
     admin_log = '/.../admin.log'
+    web_log = '/.../web.log'
     bot_devs = [123456789]
     url_host = 'https://example.com'
     url_path = '/telegram/'

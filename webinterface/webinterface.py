@@ -3,6 +3,14 @@ import db
 import bot_ldap
 from telegram_shoutout_bot_conf import BotConf
 
+# Log for web actions
+webLogger = logging.getLogger('TelegramShoutoutBot.web')
+webLogger.setLevel(logging.INFO)
+web_file_handler = logging.FileHandler(BotConf.web_log)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+web_file_handler.setFormatter(formatter)
+webLogger.addHandler(web_file_handler)
+
 app = Flask(__name__)
 
 my_database = db.MyDatabase(BotConf.database_file)
@@ -45,5 +53,6 @@ def register_login(chat_id):
         user.ldap_account = ldap_account
         user.ldap_register_token = None
         session.commit()
-    return render_template('register_login_success.html', chat_id=chat_id, token=token, username=username,
-                           password=password)
+        log_message_format = "Registered chat_id {0} with token {1} for LDAP-User {2}"
+        webLogger.info(log_message_format.format(chat_id, token, username))
+    return render_template('register_login_success.html', chat_id=chat_id, token=token, username=username)
