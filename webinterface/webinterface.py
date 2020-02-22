@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template
+from flask import Flask, g, request, render_template
 import logging
 import db
 import bot_ldap
@@ -17,6 +17,11 @@ app = Flask(__name__)
 my_database = db.MyDatabase(BotConf.database_file)
 ldap_access = bot_ldap.LdapAccess(BotConf.ldap_server, BotConf.ldap_user,
                                   BotConf.ldap_password, BotConf.ldap_base_group_filter)
+
+@app.before_request
+def before_request():
+    g.url_libs = BotConf.url_libs
+    g.url_path = BotConf.url_path
 
 
 @app.route('/')
@@ -37,13 +42,15 @@ def register_login(chat_id):
     password = request.form['password']
     ldap_account = BotConf.ldap_username_template.format(username)
     if not ldap_access.check_credentials(ldap_account, password):
-        return render_template('register_login_fail.html', reason="ldap")
+        return render_template('register_login_fail.html', reason="ldap", chat_id=chat_id, token=token)
     with db.my_session_scope(my_database) as session:  # type: db.MyDatabaseSession
         user = session.get_user_by_chat_id(chat_id)
         if user is None:
-            return render_template('register_login_fail.html', reason="chat_id")
+            return render_template('register_login_fail.html', reason="chat_id",
+                                   chat_id=chat_id, token=token)
         if user.ldap_register_token != token:
-            return render_template('register_login_fail.html', reason="token")
+            return render_template('register_login_fail.html', reason="token",
+                                   chat_id=chat_id, token=token)
         user.ldap_account = ldap_account
         user.ldap_register_token = None
         session.commit()

@@ -129,8 +129,8 @@ class TelegramShoutoutBot:
                 token = ''.join(random.choice(letters_and_digits) for i in range(20))
                 user.ldap_register_token = token
                 session.commit()
-                # TODO: Write webpage and output link here
-                answer = "Chat ID: {0}, Token: {1}".format(chat_id, token)
+                answer = "Bitte klicke auf den folgenden Link:\n" \
+                         "{0}{1}register/{2}?token={3}".format(BotConf.url_host, BotConf.url_path, chat_id, token)
         context.bot.send_message(chat_id=chat_id, text=answer)
 
     def cmd_unregister(self, update: Update, context: CallbackContext):
