@@ -25,7 +25,7 @@ from senddata import SendData
 # Logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-file_handler = logging.FileHandler(BotConf.log_file)
+file_handler = logging.FileHandler(BotConf.error_log)
 stream_handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
@@ -38,6 +38,12 @@ adminLogger.setLevel(logging.INFO)
 admin_file_handler = logging.FileHandler(BotConf.admin_log)
 admin_file_handler.setFormatter(formatter)
 adminLogger.addHandler(admin_file_handler)
+# Log for admin actions
+userLogger = logging.getLogger('TelegramShoutoutBot.user')
+userLogger.setLevel(logging.INFO)
+user_file_handler = logging.FileHandler(BotConf.user_log)
+user_file_handler.setFormatter(formatter)
+userLogger.addHandler(user_file_handler)
 
 # States for conversation
 SEND_CHANNEL, SEND_MESSAGE, SEND_CONFIRMATION, SUBSCRIBE_CHANNEL, UNSUBSCRIBE_CHANNEL = range(0, 5)
@@ -141,7 +147,9 @@ class TelegramShoutoutBot:
             if user is None:
                 context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
             else:
+                ldap_account_name = user.ldap_account
                 session.remove_ldap(chat_id)
+                userLogger.info("User {0} removed his account connection to {1}.".format(chat_id, ldap_account_name))
                 context.bot.send_message(chat_id=chat_id, text="Account-Zuordnung entfernt")
 
     # Starting here: Functions for conv_send_handler
@@ -304,6 +312,7 @@ class TelegramShoutoutBot:
                 return ConversationHandler.END
             elif channel is not None:
                 session.add_channel(chat_id, channel)
+                userLogger.info("User {0} subscribed channel {1}.".format(chat_id, channel.name))
                 answer = "Kanal abonniert: " + channel.name
                 context.bot.send_message(chat_id=chat_id, text=answer)
                 return ConversationHandler.END
@@ -355,6 +364,7 @@ class TelegramShoutoutBot:
                 # no return statement (stay in same state)
             else:
                 session.remove_channel(chat_id, channel)
+                userLogger.info("User {0} desubscribed channel {1}.".format(chat_id, channel.name))
                 answer = "Kanal deabonniert: " + channel.name
                 context.bot.send_message(chat_id=chat_id, text=answer)
                 return ConversationHandler.END
