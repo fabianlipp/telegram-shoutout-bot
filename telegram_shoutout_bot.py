@@ -5,6 +5,7 @@ import string
 import sys
 import traceback
 import warnings
+from collections import OrderedDict
 from queue import Queue, Empty
 
 import telegram.bot
@@ -60,6 +61,21 @@ CB_CHANNEL_REGEX = r"^" + CB_CHANNEL_PREFIX + r"(\d+)"
 # TODO: Alternative for deletion of keyboards: check in every call if there is an outdated keyboard for the current user
 #  (every keyboard if there was a message afterwards?)
 
+GENERAL_COMMANDS = OrderedDict(
+    [('start', 'Shoutout starten'),
+     ('stop', 'Alle Nachrichten deaktivieren, Daten werden vom Server gelöscht'),
+     ('help', 'Diese Hilfenachricht anzeigen'),
+     ('subscribe', 'Zusätzlichen Kanal abonnieren'),
+     ('unsubscribe', 'Einzelnen Kanal abbestellen')
+     ]
+)
+ADMIN_COMMANDS = OrderedDict(
+    [('admin', 'Eigenen Admin-Status anzeigen'),
+     ('register', 'Eigenen Account mit einem DPSG-Account verknüpfen'),
+     ('unregister', 'Verknüpfung zum DPSG-Account lösen'),
+     ('send', 'Nachricht an Abonnenten senden')
+     ]
+)
 
 class TelegramShoutoutBot:
     my_database = None  # type: db.MyDatabase
@@ -91,18 +107,12 @@ class TelegramShoutoutBot:
     def cmd_help(self, update: Update, context: CallbackContext):
         self.remove_all_inline_keyboards(update, context)
         chat_id = update.effective_chat.id
-        answer = "Verfügbare Kommandos:\n" \
-                 "/start - Shoutout starten.\n" \
-                 "/stop - Alle Nachrichten deaktivieren, Daten werden vom Server gelöscht.\n" \
-                 "/help - Diese Hilfenachricht anzeigen.\n" \
-                 "/subscribe - Zusätzlichen Kanal abonnieren.\n" \
-                 "/unsubscribe - Einzelnen Kanal abbestellen.\n" \
-                 "\n" \
-                 "Befehle für Administratoren\n" \
-                 "/admin - Eigenen Admin-Status anzeigen.\n" \
-                 "/register - Eigenen Account mit einem DPSG-Account verknüpfen.\n" \
-                 "/unregister - Verknüpfung zum DPSG-Account lösen.\n" \
-                 "/send - Nachricht an Abonnenten senden.\n"
+        answer = "Verfügbare Kommandos:\n"
+        for key, val in GENERAL_COMMANDS.items():
+            answer += "/{0} - {1}\n".format(key, val)
+        answer += "\nBefehle für Administratoren\n"
+        for key, val in ADMIN_COMMANDS.items():
+            answer += "/{0} - {1}\n".format(key, val)
         context.bot.send_message(chat_id=chat_id, text=answer)
 
     def cmd_admin(self, update: Update, context: CallbackContext):
@@ -387,8 +397,12 @@ class TelegramShoutoutBot:
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
 
     def answer_invalid_cmd(self, update: Update, context: CallbackContext):
-        answer = "Du kannst dieses Kommando gerade nicht anwenden.\n" \
-                 "Vermutlich musst du das vorherige Kommando mit /cancel abbrechen."
+        command = update.message.text[1:] # type: str
+        if command in GENERAL_COMMANDS or command in ADMIN_COMMANDS:
+            answer = "Du kannst dieses Kommando gerade nicht anwenden.\n" \
+                     "Vermutlich musst du das vorherige Kommando mit /cancel abbrechen."
+        else:
+            answer = "Dieses Kommando gibt es nicht."
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
 
     def answer_invalid_msg(self, update: Update, context: CallbackContext):
