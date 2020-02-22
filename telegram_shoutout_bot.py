@@ -118,7 +118,7 @@ class TelegramShoutoutBot:
                 answer = "Du hast einen DPSG-Account mit deinem Telegram-Zugang verbunden " \
                          "und hast Admin-Rechte in Telegram."
             else:
-                answer = "Du hast einen DPSG-Account mit deinem Telegram-Zugang verbunden," \
+                answer = "Du hast einen DPSG-Account mit deinem Telegram-Zugang verbunden, " \
                          "hast aber noch keine Admin-Rechte in Telegram.\n" \
                          "Wende dich mit deiner Chat-ID {0} ans Webteam um Admin-Rechte zu erhalten.".format(chat_id)
             context.bot.send_message(chat_id=chat_id, text=answer)
@@ -130,6 +130,9 @@ class TelegramShoutoutBot:
             user = session.get_user_by_chat_id(chat_id)
             if user is None:
                 answer = self.get_message_user_not_known()
+            elif user.ldap_account is not None:
+                answer = "Du hast bereits einen DPSG-Account mit deinem Telegram-Zugang verbunden. " \
+                         "Verwende /unregister um diese Verbindung zu lösen."
             else:
                 letters_and_digits = string.ascii_letters + string.digits
                 token = ''.join(random.choice(letters_and_digits) for i in range(20))
@@ -145,12 +148,16 @@ class TelegramShoutoutBot:
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
             user = session.get_user_by_chat_id(chat_id)
             if user is None:
-                context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
+                answer = self.get_message_user_not_known()
+            elif user.ldap_account is None:
+                answer = "Du hast keinen DPSG-Account mit deinem Telegram-Zugang verbunden. " \
+                         "Verwende /register um einen Account zu verbinden."
             else:
                 ldap_account_name = user.ldap_account
                 session.remove_ldap(chat_id)
                 userLogger.info("User {0} removed his account connection to {1}.".format(chat_id, ldap_account_name))
-                context.bot.send_message(chat_id=chat_id, text="Account-Zuordnung entfernt")
+                answer = "Account-Zuordnung entfernt"
+            context.bot.send_message(chat_id=chat_id, text=answer)
 
     # Starting here: Functions for conv_send_handler
     def cmd_send(self, update: Update, context: CallbackContext):
