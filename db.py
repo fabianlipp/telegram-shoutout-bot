@@ -18,11 +18,8 @@ user_channels = Table('user_channels', Base.metadata,
 
 
 def case_insensitive_string(length):
-    return String(length).with_variant(
-        String(length, collation='utf8_general_ci'), 'mysql'
-    ).with_variant(
-        String(length, collation='NOCASE'), 'sqlite'
-    )
+    return String(length).with_variant(String(length, collation='utf8_general_ci'), 'mysql')\
+        .with_variant(String(length, collation='NOCASE'), 'sqlite')
 
 
 class User(Base):
@@ -62,10 +59,10 @@ class User(Base):
 class Channel(Base):
     __tablename__ = "channels"
     id = Column(Integer, primary_key=True)
-    name = Column(case_insensitive_string(255), unique=True)
+    name = Column(case_insensitive_string(255), unique=True, nullable=False)
     description = Column(String(1024))
-    default = Column(Boolean, default=False)
-    ldap_filter = Column(String(1024))
+    default = Column(Boolean, default=False, nullable=False)
+    ldap_filter = Column(String(1024), nullable=False)
 
     users = relationship('User',
                          secondary=user_channels,
