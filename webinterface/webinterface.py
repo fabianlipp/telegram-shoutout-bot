@@ -1,4 +1,5 @@
 from flask import Flask, g, request, render_template
+import logging
 import db
 import bot_ldap
 from telegram_shoutout_bot_conf import BotConf
