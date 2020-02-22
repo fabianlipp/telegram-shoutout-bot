@@ -10,5 +10,6 @@ class BotConf:
     admin_log = '/.../admin.log'
     web_log = '/.../web.log'
     bot_devs = [123456789]
+    url_libs = '/libs/'
     url_host = 'https://example.com'
     url_path = '/telegram/'
