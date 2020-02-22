@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from sqlalchemy import Table, Column, Integer, String, Boolean, ForeignKey, event, create_engine
 import sqlalchemy.engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship, selectinload, Session  # , scoped_session
+from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm.collections import attribute_mapped_collection
 
 from sqlite3 import Connection as SQLite3Connection
@@ -17,16 +17,24 @@ user_channels = Table('user_channels', Base.metadata,
                       )
 
 
+def case_insensitive_string(length):
+    return String(length).with_variant(
+        String(length, collation='utf8_general_ci'), 'mysql'
+    ).with_variant(
+        String(length, collation='NOCASE'), 'sqlite'
+    )
+
+
 class User(Base):
     __tablename__ = "users"
     chat_id = Column(Integer, primary_key=True)
-    username = Column(String)
-    first_name = Column(String)
-    last_name = Column(String)
+    username = Column(String(255))
+    first_name = Column(String(255))
+    last_name = Column(String(255))
     time_start = Column(Integer)
-    last_msg = Column(String)
-    ldap_account = Column(String)
-    ldap_register_token = Column(String)
+    last_msg = Column(String(255))
+    ldap_account = Column(String(1024))
+    ldap_register_token = Column(String(25))
 
     channels = relationship('Channel',
                             collection_class=attribute_mapped_collection('name'),
@@ -54,10 +62,10 @@ class User(Base):
 class Channel(Base):
     __tablename__ = "channels"
     id = Column(Integer, primary_key=True)
-    name = Column(String(collation='NOCASE'), unique=True)
-    description = Column(String)
+    name = Column(case_insensitive_string(255), unique=True)
+    description = Column(String(1024))
     default = Column(Boolean, default=False)
-    ldap_filter = Column(String)
+    ldap_filter = Column(String(1024))
 
     users = relationship('User',
                          secondary=user_channels,
@@ -81,7 +89,7 @@ class MyDatabaseSession:
         self.session.rollback()
 
     def get_user_by_chat_id(self, chat_id) -> User:
-        return self.session.query(User).filter(User.chat_id.is_(chat_id)).first()
+        return self.session.query(User).filter(User.chat_id == chat_id).first()
 
     def get_users(self):
         return self.session.query(User).all()
@@ -95,25 +103,25 @@ class MyDatabaseSession:
             self.session.add(user)
 
     def delete_user(self, chat_id):
-        self.session.query(User).filter(User.chat_id.is_(chat_id)).delete()
+        self.session.query(User).filter(User.chat_id == chat_id).delete()
 
     def add_channel(self, chat_id, channel: Channel):
-        user = self.session.query(User).filter(User.chat_id.is_(chat_id)).one()
+        user = self.session.query(User).filter(User.chat_id == chat_id).one()
         user.channels[channel.name] = channel
 
     def remove_channel(self, chat_id, channel: Channel):
-        user = self.session.query(User).filter(User.chat_id.is_(chat_id)).one()
+        user = self.session.query(User).filter(User.chat_id == chat_id).one()
         del user.channels[channel.name]
 
     def remove_ldap(self, chat_id):
-        user = self.session.query(User).filter(User.chat_id.is_(chat_id)).one()
+        user = self.session.query(User).filter(User.chat_id == chat_id).one()
         user.ldap_account = None
 
     def get_channel_by_name(self, name: str):
-        return self.session.query(Channel).filter(Channel.name.is_(name)).first()
+        return self.session.query(Channel).filter(Channel.name == name).first()
 
     def get_channel_by_id(self, channel_id: int):
-        return self.session.query(Channel).filter(Channel.id.is_(channel_id)).first()
+        return self.session.query(Channel).filter(Channel.id == channel_id).first()
 
     def get_channels(self):
         return self.session.query(Channel).all()
@@ -122,12 +130,12 @@ class MyDatabaseSession:
 class MyDatabase:
     db_engine = None
 
-    def __init__(self, filename):
-        self.db_engine = create_engine('sqlite:///' + filename, echo=False)
+    def __init__(self, database_url):
+        self.db_engine = create_engine(database_url, echo=False)
         try:
             # TODO: Check whether schema is correct if it already exists
             Base.metadata.create_all(self.db_engine)
-            #print("Tables created")
+            # print("Tables created")
         except Exception as e:
             print("Error occurred during Table creation!")
             print(e)
@@ -152,7 +160,7 @@ def my_session_scope(db: MyDatabase):
 
 
 @event.listens_for(sqlalchemy.engine.Engine, "connect")
-def _set_sqlite_pragma(dbapi_connection, connection_record):
+def _set_sqlite_pragma(dbapi_connection, _connection_record):
     if isinstance(dbapi_connection, SQLite3Connection):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON;")

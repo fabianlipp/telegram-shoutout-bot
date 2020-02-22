@@ -394,7 +394,7 @@ class TelegramShoutoutBot:
         trace = "".join(traceback.format_tb(sys.exc_info()[2]))
         # lets try to get as much information from the telegram update as possible
         payload = ""
-        # normally, we always have an user. If not, its either a channel or a poll update.
+        # normally, we always have a user. If not, its either a channel or a poll update.
         if update.effective_user:
             payload += ' with the user {0}'.format(update.effective_user.id)
         # there are more situations when you don't get a chat
@@ -515,7 +515,7 @@ class TelegramShoutoutBot:
     def __init__(self):
         from telegram.utils.request import Request
 
-        self.my_database = db.MyDatabase(BotConf.database_file)
+        self.my_database = db.MyDatabase(BotConf.database_url)
 
         self.ldap_access = bot_ldap.LdapAccess(BotConf.ldap_server, BotConf.ldap_user,
                                                BotConf.ldap_password, BotConf.ldap_base_group_filter)
