@@ -14,7 +14,7 @@ webLogger.addHandler(web_file_handler)
 
 app = Flask(__name__)
 
-my_database = db.MyDatabase(BotConf.database_file)
+my_database = db.MyDatabase(BotConf.database_url)
 ldap_access = bot_ldap.LdapAccess(BotConf.ldap_server, BotConf.ldap_user,
                                   BotConf.ldap_password, BotConf.ldap_base_group_filter)
 
