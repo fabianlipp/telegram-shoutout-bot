@@ -3,13 +3,27 @@
 <h1>Telegram Bot Registrierung</h1>
 <form action="{{ g.url_path }}register/{{ chat_id }}/login" method="post">
     <input type="hidden" name="token" value="{{ token }}">
-	<div class="input-group">
-		<input type="text" class="form-control" name="username" value="">
-		<input type="password" class="form-control" name="password" value="">
-		<div class="input-group-append">
-			<input type="submit" class="btn btn-primary" name="login" value="Login">
-		</div>
+    <div class="form-row">
+	<div class="form-group col-md-5">
+            <div class="input-group">
+                <div class="input-group-prepend">
+                    <span class="input-group-text">Benutzer</span>
+                </div>
+                <input type="text" class="form-control" name="username">
+	    </div>
 	</div>
+	<div class="form-group col-md-5">
+	    <div class="input-group">
+                <div class="input-group-prepend">
+                    <span class="input-group-text">Passwort</span>
+                </div>
+                <input type="password" class="form-control" name="password">
+	    </div>
+	</div>
+	<div class="form-group col-md-2">
+            <input type="submit" class="btn btn-primary btn-block" name="login" value="Login">
+	</div>
+    </div>
 </form>
 <small class="text-muted">chat_id={{ chat_id }}, token={{ token }}</small>
 {% endblock %}
