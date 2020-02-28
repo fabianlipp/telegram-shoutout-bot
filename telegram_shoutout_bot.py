@@ -309,8 +309,8 @@ class TelegramShoutoutBot:
             else:
                 answer = "Kanal eingeben, der abonniert werden soll oder Abbrechen mit /cancel.\n" \
                          "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(session, chat_id) + \
-                         "Alle verfügbaren Kanäle:\n" + self.get_all_channel_list(session)
-                reply_markup = self.get_all_channel_keyboard(session, CB_SUBSCRIBE_CANCEL)
+                         "Verfügbare Kanäle:\n" + self.get_unsubscribed_channel_list(session, chat_id)
+                reply_markup = self.get_unsubscribed_channel_keyboard(session, chat_id, CB_SUBSCRIBE_CANCEL)
                 context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                 return SUBSCRIBE_CHANNEL
 
@@ -489,6 +489,12 @@ class TelegramShoutoutBot:
             answer += "{0} - {1}\n".format(channel.name, channel.description)
         return answer
 
+    def get_unsubscribed_channel_list(self, session: MyDatabaseSession, chat_id) -> str:
+        answer = ""
+        for channel in session.get_unsubscribed_channels(chat_id):
+            answer += "{0} - {1}\n".format(channel.name, channel.description)
+        return answer
+
     def get_all_channel_keyboard(self, session: MyDatabaseSession, cancel_callback_data: str) -> InlineKeyboardMarkup:
         keyboard = []
         for channel in session.get_channels():
@@ -498,11 +504,21 @@ class TelegramShoutoutBot:
         keyboard.append([InlineKeyboardButton("Cancel", callback_data=cancel_callback_data)])
         return InlineKeyboardMarkup(keyboard)
 
-    def get_subscribed_channel_keyboard(self, session: MyDatabaseSession, chat_id, cancel_callback_data: str)\
+    def get_subscribed_channel_keyboard(self, session: MyDatabaseSession, chat_id, cancel_callback_data: str) \
             -> InlineKeyboardMarkup:
         keyboard = []
         user = session.get_user_by_chat_id(chat_id)
         for channel in user.channels.values():
+            button_text = "{0} - {1}\n".format(channel.name, channel.description)
+            callback_data = CB_CHANNEL_PREFIX + str(channel.id)
+            keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+        keyboard.append([InlineKeyboardButton("Cancel", callback_data=cancel_callback_data)])
+        return InlineKeyboardMarkup(keyboard)
+
+    def get_unsubscribed_channel_keyboard(self, session: MyDatabaseSession, chat_id, cancel_callback_data: str)\
+            -> InlineKeyboardMarkup:
+        keyboard = []
+        for channel in session.get_unsubscribed_channels(chat_id):
             button_text = "{0} - {1}\n".format(channel.name, channel.description)
             callback_data = CB_CHANNEL_PREFIX + str(channel.id)
             keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])

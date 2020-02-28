@@ -123,6 +123,11 @@ class MyDatabaseSession:
     def get_channels(self):
         return self.session.query(Channel).all()
 
+    def get_unsubscribed_channels(self, chat_id: int):
+        subquery = self.session.query(user_channels.columns['channel_id'])\
+            .filter(user_channels.columns['chat_id'] == chat_id).subquery('subquery')
+        return self.session.query(Channel).filter(Channel.id.notin_(subquery)).all()
+
 
 class MyDatabase:
     db_engine = None
