@@ -7,6 +7,7 @@ import traceback
 import warnings
 from collections import OrderedDict
 from queue import Queue, Empty
+from typing import Iterable
 
 import telegram.bot
 from telegram import Message, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
@@ -179,9 +180,10 @@ class TelegramShoutoutBot:
                 context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
                 return ConversationHandler.END
             elif user.ldap_account is not None and self.ldap_access.check_usergroup(user.ldap_account):
+                all_channels = session.get_channels()
                 answer = "Kanal eingeben, an den die Nachricht gesendet werden soll.\n" \
-                         "Verfügbare Kanäle:\n" + self.get_all_channel_list(session)
-                reply_markup = self.get_all_channel_keyboard(session, CB_SEND_CANCEL)
+                         "Verfügbare Kanäle:\n" + self.create_channel_list(all_channels)
+                reply_markup = self.create_channel_keyboard(all_channels, CB_SEND_CANCEL)
                 context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                 return SEND_CHANNEL
             else:
@@ -214,7 +216,8 @@ class TelegramShoutoutBot:
                     return SEND_MESSAGE
                 else:
                     answer = "Du hast keine Berechtigung an diesen Kanal zu schreiben."
-                    reply_markup = self.get_all_channel_keyboard(session, CB_SEND_CANCEL)
+                    all_channels = session.get_channels()
+                    reply_markup = self.create_channel_keyboard(all_channels, CB_SEND_CANCEL)
                     context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                     # no return statement (stay in same state)
 
@@ -307,10 +310,12 @@ class TelegramShoutoutBot:
                 context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
                 return ConversationHandler.END
             else:
+                subscribed_channels = user.channels.values()
+                unsubscribed_channels = session.get_unsubscribed_channels(chat_id)
                 answer = "Kanal eingeben, der abonniert werden soll oder Abbrechen mit /cancel.\n" \
-                         "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(session, chat_id) + \
-                         "Verfügbare Kanäle:\n" + self.get_unsubscribed_channel_list(session, chat_id)
-                reply_markup = self.get_unsubscribed_channel_keyboard(session, chat_id, CB_SUBSCRIBE_CANCEL)
+                         "Bereits abonnierte Kanäle:\n" + self.create_channel_list(subscribed_channels) + \
+                         "Verfügbare Kanäle:\n" + self.create_channel_list(unsubscribed_channels)
+                reply_markup = self.create_channel_keyboard(unsubscribed_channels, CB_SUBSCRIBE_CANCEL)
                 context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                 return SUBSCRIBE_CHANNEL
 
@@ -354,9 +359,10 @@ class TelegramShoutoutBot:
                 context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
                 return ConversationHandler.END
             else:
+                subscribed_channels = user.channels.values()
                 answer = "Kanal eingeben, der deabonniert werden soll oder Abbrechen mit /cancel.\n" \
-                         "Bereits abonnierte Kanäle:\n" + self.get_subscribed_channel_list(session, chat_id)
-                reply_markup = self.get_subscribed_channel_keyboard(session, chat_id, CB_UNSUBSCRIBE_CANCEL)
+                         "Bereits abonnierte Kanäle:\n" + self.create_channel_list(subscribed_channels)
+                reply_markup = self.create_channel_keyboard(subscribed_channels, CB_UNSUBSCRIBE_CANCEL)
                 context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                 return UNSUBSCRIBE_CHANNEL
 
@@ -476,49 +482,17 @@ class TelegramShoutoutBot:
             )
         # Not handled so far: voice, document, audio, video, contact, venue, location, video_note, game
 
-    def get_all_channel_list(self, session: MyDatabaseSession) -> str:
+    @staticmethod
+    def create_channel_list(channels: Iterable):
         answer = ""
-        for channel in session.get_channels():
+        for channel in channels:
             answer += "{0} - {1}\n".format(channel.name, channel.description)
         return answer
 
-    def get_subscribed_channel_list(self, session: MyDatabaseSession, chat_id) -> str:
-        answer = ""
-        user = session.get_user_by_chat_id(chat_id)
-        for channel in user.channels.values():
-            answer += "{0} - {1}\n".format(channel.name, channel.description)
-        return answer
-
-    def get_unsubscribed_channel_list(self, session: MyDatabaseSession, chat_id) -> str:
-        answer = ""
-        for channel in session.get_unsubscribed_channels(chat_id):
-            answer += "{0} - {1}\n".format(channel.name, channel.description)
-        return answer
-
-    def get_all_channel_keyboard(self, session: MyDatabaseSession, cancel_callback_data: str) -> InlineKeyboardMarkup:
+    @staticmethod
+    def create_channel_keyboard(channels: Iterable, cancel_callback_data: str) -> InlineKeyboardMarkup:
         keyboard = []
-        for channel in session.get_channels():
-            button_text = "{0} - {1}\n".format(channel.name, channel.description)
-            callback_data = CB_CHANNEL_PREFIX + str(channel.id)
-            keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data=cancel_callback_data)])
-        return InlineKeyboardMarkup(keyboard)
-
-    def get_subscribed_channel_keyboard(self, session: MyDatabaseSession, chat_id, cancel_callback_data: str) \
-            -> InlineKeyboardMarkup:
-        keyboard = []
-        user = session.get_user_by_chat_id(chat_id)
-        for channel in user.channels.values():
-            button_text = "{0} - {1}\n".format(channel.name, channel.description)
-            callback_data = CB_CHANNEL_PREFIX + str(channel.id)
-            keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data=cancel_callback_data)])
-        return InlineKeyboardMarkup(keyboard)
-
-    def get_unsubscribed_channel_keyboard(self, session: MyDatabaseSession, chat_id, cancel_callback_data: str)\
-            -> InlineKeyboardMarkup:
-        keyboard = []
-        for channel in session.get_unsubscribed_channels(chat_id):
+        for channel in channels:
             button_text = "{0} - {1}\n".format(channel.name, channel.description)
             callback_data = CB_CHANNEL_PREFIX + str(channel.id)
             keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
