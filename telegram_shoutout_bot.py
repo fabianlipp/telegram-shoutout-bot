@@ -78,6 +78,7 @@ ADMIN_COMMANDS = OrderedDict(
      ]
 )
 
+
 class TelegramShoutoutBot:
     my_database = None  # type: db.MyDatabase
     ldap_access = None  # type: bot_ldap.LdapAccess
@@ -146,7 +147,7 @@ class TelegramShoutoutBot:
                          "Verwende /unregister um diese Verbindung zu lösen."
             else:
                 letters_and_digits = string.ascii_letters + string.digits
-                token = ''.join(random.choice(letters_and_digits) for i in range(20))
+                token = ''.join(random.choice(letters_and_digits) for _ in range(20))
                 user.ldap_register_token = token
                 session.commit()
                 answer = "Bitte klicke auf den folgenden Link:\n" \
@@ -182,8 +183,8 @@ class TelegramShoutoutBot:
             elif user.ldap_account is not None and self.ldap_access.check_usergroup(user.ldap_account):
                 all_channels = session.get_channels()
                 answer = "Kanal eingeben, an den die Nachricht gesendet werden soll.\n" \
-                         "Verfügbare Kanäle:\n" + self.create_channel_list(all_channels)
-                reply_markup = self.create_channel_keyboard(all_channels, CB_SEND_CANCEL)
+                         "Verfügbare Kanäle:\n" + TelegramShoutoutBot.create_channel_list(all_channels)
+                reply_markup = TelegramShoutoutBot.create_channel_keyboard(all_channels, CB_SEND_CANCEL)
                 context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                 return SEND_CHANNEL
             else:
@@ -217,7 +218,7 @@ class TelegramShoutoutBot:
                 else:
                     answer = "Du hast keine Berechtigung an diesen Kanal zu schreiben."
                     all_channels = session.get_channels()
-                    reply_markup = self.create_channel_keyboard(all_channels, CB_SEND_CANCEL)
+                    reply_markup = TelegramShoutoutBot.create_channel_keyboard(all_channels, CB_SEND_CANCEL)
                     context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                     # no return statement (stay in same state)
 
@@ -227,7 +228,7 @@ class TelegramShoutoutBot:
         send_data = context.user_data["send"]  # type: SendData
         if send_data.messages is None:
             send_data.messages = []
-        if self.message_valid(update.message):
+        if TelegramShoutoutBot.message_valid(update.message):
             send_data.messages.append(update.message)
             answer = "Weitere Nachrichten anfügen, abschließen mit /done oder Abbrechen mit /cancel."
             keyboard = [[InlineKeyboardButton("Done", callback_data=CB_SEND_DONE)],
@@ -255,7 +256,7 @@ class TelegramShoutoutBot:
         answer = "Kanalname: {0}".format(send_data.channel)
         context.bot.send_message(chat_id=chat_id, text=answer)
         for message in send_data.messages:  # type: Message
-            self.resend_message(update.effective_chat.id, message, context)
+            TelegramShoutoutBot.resend_message(update.effective_chat.id, message, context)
 
         # Message asking for confirmation
         answer = "Versand bestätigen mit /confirm oder Abbrechen mit /cancel."
@@ -290,7 +291,7 @@ class TelegramShoutoutBot:
             for user in session.get_users():
                 if channel_name in user.channels:
                     for message in send_data.messages:
-                        self.resend_message(user.chat_id, message, context)
+                        TelegramShoutoutBot.resend_message(user.chat_id, message, context)
             return ConversationHandler.END
 
     def cancel_send(self, update: Update, context: CallbackContext):
@@ -313,9 +314,11 @@ class TelegramShoutoutBot:
                 subscribed_channels = user.channels.values()
                 unsubscribed_channels = session.get_unsubscribed_channels(chat_id)
                 answer = "Kanal eingeben, der abonniert werden soll oder Abbrechen mit /cancel.\n" \
-                         "Bereits abonnierte Kanäle:\n" + self.create_channel_list(subscribed_channels) + \
-                         "Verfügbare Kanäle:\n" + self.create_channel_list(unsubscribed_channels)
-                reply_markup = self.create_channel_keyboard(unsubscribed_channels, CB_SUBSCRIBE_CANCEL)
+                         "Bereits abonnierte Kanäle:\n" + \
+                         TelegramShoutoutBot.create_channel_list(subscribed_channels) + \
+                         "Verfügbare Kanäle:\n" + \
+                         TelegramShoutoutBot.create_channel_list(unsubscribed_channels)
+                reply_markup = TelegramShoutoutBot.create_channel_keyboard(unsubscribed_channels, CB_SUBSCRIBE_CANCEL)
                 context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                 return SUBSCRIBE_CHANNEL
 
@@ -361,8 +364,8 @@ class TelegramShoutoutBot:
             else:
                 subscribed_channels = user.channels.values()
                 answer = "Kanal eingeben, der deabonniert werden soll oder Abbrechen mit /cancel.\n" \
-                         "Bereits abonnierte Kanäle:\n" + self.create_channel_list(subscribed_channels)
-                reply_markup = self.create_channel_keyboard(subscribed_channels, CB_UNSUBSCRIBE_CANCEL)
+                         "Bereits abonnierte Kanäle:\n" + TelegramShoutoutBot.create_channel_list(subscribed_channels)
+                reply_markup = TelegramShoutoutBot.create_channel_keyboard(subscribed_channels, CB_UNSUBSCRIBE_CANCEL)
                 context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                 return UNSUBSCRIBE_CHANNEL
 
@@ -398,12 +401,14 @@ class TelegramShoutoutBot:
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         return ConversationHandler.END
 
-    def answer_invalid_cancel(self, update: Update, context: CallbackContext):
+    @staticmethod
+    def answer_invalid_cancel(update: Update, context: CallbackContext):
         answer = "Du befindest dich bereits im Hauptmenü und kannst gerade nichts abbrechen."
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
 
-    def answer_invalid_cmd(self, update: Update, context: CallbackContext):
-        command = update.message.text[1:] # type: str
+    @staticmethod
+    def answer_invalid_cmd(update: Update, context: CallbackContext):
+        command = update.message.text[1:]  # type: str
         if command in GENERAL_COMMANDS or command in ADMIN_COMMANDS:
             answer = "Du kannst dieses Kommando gerade nicht anwenden.\n" \
                      "Vermutlich musst du das vorherige Kommando mit /cancel abbrechen."
@@ -411,12 +416,14 @@ class TelegramShoutoutBot:
             answer = "Dieses Kommando gibt es nicht."
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
 
-    def answer_invalid_msg(self, update: Update, context: CallbackContext):
+    @staticmethod
+    def answer_invalid_msg(update: Update, context: CallbackContext):
         answer = "Ich verstehe diese Nachricht gerade nicht.\n" \
                  "Benutze /help für eine Liste der vefügbaren Kommandos."
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
 
-    def error(self, update: Update, context: CallbackContext):
+    @staticmethod
+    def error(update: Update, context: CallbackContext):
         """Log Errors caused by Updates."""
         # we want to notify the user of this problem. This will always work, but not notify users if the update is an
         # callback or inline query, or a poll update. In case you want this, keep in mind that sending the message
@@ -483,7 +490,7 @@ class TelegramShoutoutBot:
         # Not handled so far: voice, document, audio, video, contact, venue, location, video_note, game
 
     @staticmethod
-    def create_channel_list(channels: Iterable):
+    def create_channel_list(channels: Iterable) -> str:
         answer = ""
         for channel in channels:
             answer += "{0} - {1}\n".format(channel.name, channel.description)
@@ -524,7 +531,8 @@ class TelegramShoutoutBot:
                                                       reply_markup=None)
             del self.keyboard_message_user_lists[chat_id]
 
-    def get_channel_from_update(self, session: MyDatabaseSession, update: Update, context: CallbackContext):
+    @staticmethod
+    def get_channel_from_update(session: MyDatabaseSession, update: Update, context: CallbackContext):
         # Channel name can be given as a string in the message or as a corresponding callback handler containing the id
         if update.message:
             requested_channel = update.message.text
@@ -602,15 +610,15 @@ class TelegramShoutoutBot:
             )
         dispatcher.add_handler(conversation_handler)
 
-        fallback_cancel_handler = CommandHandler('cancel', self.answer_invalid_cancel)
-        fallback_cmd_handler = MessageHandler(Filters.command, self.answer_invalid_cmd)
-        fallback_msg_handler = MessageHandler(Filters.all, self.answer_invalid_msg)
+        fallback_cancel_handler = CommandHandler('cancel', TelegramShoutoutBot.answer_invalid_cancel)
+        fallback_cmd_handler = MessageHandler(Filters.command, TelegramShoutoutBot.answer_invalid_cmd)
+        fallback_msg_handler = MessageHandler(Filters.all, TelegramShoutoutBot.answer_invalid_msg)
         dispatcher.add_handler(fallback_cancel_handler)
         dispatcher.add_handler(fallback_cmd_handler)
         dispatcher.add_handler(fallback_msg_handler)
 
         # log all errors
-        dispatcher.add_error_handler(self.error)
+        dispatcher.add_error_handler(TelegramShoutoutBot.error)
 
         updater.start_polling()
         updater.idle()

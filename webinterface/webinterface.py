@@ -18,6 +18,7 @@ my_database = db.MyDatabase(BotConf.database_url)
 ldap_access = bot_ldap.LdapAccess(BotConf.ldap_server, BotConf.ldap_user,
                                   BotConf.ldap_password, BotConf.ldap_base_group_filter)
 
+
 @app.before_request
 def before_request():
     g.url_libs = BotConf.url_libs
