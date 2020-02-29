@@ -63,6 +63,7 @@ class Channel(Base):
     name = Column(case_insensitive_string(255), unique=True, nullable=False)
     description = Column(String(1024))
     default = Column(Boolean, default=False, nullable=False)
+    mandatory = Column(Boolean, default=False, nullable=False)
     ldap_filter = Column(String(1024), nullable=False)
 
     users = relationship('User',

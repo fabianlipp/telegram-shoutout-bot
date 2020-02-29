@@ -81,8 +81,8 @@ ADMIN_COMMANDS = OrderedDict(
 
 
 class TelegramShoutoutBot:
-    my_database = None  # type: db.MyDatabase
-    ldap_access = None  # type: bot_ldap.LdapAccess
+    my_database: db.MyDatabase = None
+    ldap_access: bot_ldap.LdapAccess = None
     # We use the following queue to store chat ids and message ids of messages containing inline keyboards, so that
     # those can be deleted when not needed anymore (as they could have unwanted side effects). This queue has to be
     # thread-safe as it is filled by the asynchronous calls triggered by the message queue.
@@ -372,7 +372,8 @@ class TelegramShoutoutBot:
                 context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
                 return ConversationHandler.END
             else:
-                subscribed_channels = user.channels.values()
+                # Filter out mandatory channels from list to select from
+                subscribed_channels = list(filter(lambda channel: not channel.mandatory, user.channels.values()))
                 answer = "Kanal eingeben, der deabonniert werden soll oder Abbrechen mit /cancel.\n" \
                          "Bereits abonnierte Kanäle:\n" + TelegramShoutoutBot.create_channel_list(subscribed_channels)
                 reply_markup = TelegramShoutoutBot.create_channel_keyboard(subscribed_channels, CB_UNSUBSCRIBE_CANCEL)
@@ -398,6 +399,9 @@ class TelegramShoutoutBot:
                          "Bitte anderen Kanal eingeben oder Abbrechen mit /cancel."
                 context.bot.send_message(chat_id=chat_id, text=answer)
                 # no return statement (stay in same state)
+            elif channel.mandatory:
+                answer = "Dieser Kanal ist immer abonniert und kann nicht abbestellt werden."
+                context.bot.send_message(chat_id=chat_id, text=answer)
             else:
                 session.remove_channel(chat_id, channel)
                 userLogger.info("User {0} desubscribed channel {1}.".format(chat_id, channel.name))
