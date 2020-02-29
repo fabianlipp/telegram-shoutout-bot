@@ -7,7 +7,7 @@ import traceback
 import warnings
 from collections import OrderedDict
 from queue import Queue, Empty
-from typing import Iterable
+from typing import Iterable, List, Any, Iterator, Callable
 
 import telegram.bot
 from telegram import Message, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
@@ -17,7 +17,7 @@ from telegram.ext import ConversationHandler, CallbackContext
 from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 
-from db import MyDatabaseSession
+from db import MyDatabaseSession, Channel, User
 from db import my_session_scope
 from telegram_shoutout_bot_conf import BotConf
 import db
@@ -113,7 +113,7 @@ class TelegramShoutoutBot:
         answer = "Verfügbare Kommandos:\n"
         for key, val in GENERAL_COMMANDS.items():
             answer += "/{0} - {1}\n".format(key, val)
-        answer += "\nBefehle für Administratoren\n"
+        answer += "\nBefehle für Administratoren:\n"
         for key, val in ADMIN_COMMANDS.items():
             answer += "/{0} - {1}\n".format(key, val)
         context.bot.send_message(chat_id=chat_id, text=answer)
@@ -133,8 +133,12 @@ class TelegramShoutoutBot:
             elif user.ldap_account is None:
                 answer = "Du hast keinen DPSG-Account mit deinem Telegram-Zugang verbunden."
             elif self.ldap_access.check_usergroup(user.ldap_account):
+                accessible_channels: List[Channel] = self.get_accessible_channels(session, user)
                 answer = "Du hast einen DPSG-Account mit deinem Telegram-Zugang verbunden " \
-                         "und hast Admin-Rechte in Telegram."
+                         "und hast Admin-Rechte in Telegram.\n" \
+                         "Du kannst derzeit die folgenden Kanäle beschreiben: \n"
+                answer += TelegramShoutoutBot.create_channel_list(accessible_channels)
+                answer += "Falls du Zugang zu weiteren Kanälen brauchst, wende dich ans Webteam."
             else:
                 answer = "Du hast einen DPSG-Account mit deinem Telegram-Zugang verbunden, " \
                          "hast aber noch keine Admin-Rechte in Telegram.\n" \
@@ -187,14 +191,14 @@ class TelegramShoutoutBot:
                 context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
                 return ConversationHandler.END
             elif user.ldap_account is not None and self.ldap_access.check_usergroup(user.ldap_account):
-                all_channels = session.get_channels()
+                accessible_channels: List[Channel] = self.get_accessible_channels(session, user)
                 answer = "Kanal eingeben, an den die Nachricht gesendet werden soll.\n" \
-                         "Verfügbare Kanäle:\n" + TelegramShoutoutBot.create_channel_list(all_channels)
-                reply_markup = TelegramShoutoutBot.create_channel_keyboard(all_channels, CB_SEND_CANCEL)
+                         "Verfügbare Kanäle:\n" + TelegramShoutoutBot.create_channel_list(accessible_channels)
+                reply_markup = TelegramShoutoutBot.create_channel_keyboard(accessible_channels, CB_SEND_CANCEL)
                 context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                 return SEND_CHANNEL
             else:
-                answer = "Du hast keine Admin-Rechte um Nachrichten zu verschicken."
+                answer = "Du benötigst Admin-Rechte um Nachrichten zu verschicken."
                 context.bot.send_message(chat_id=chat_id, text=answer)
                 return ConversationHandler.END
 
@@ -496,14 +500,14 @@ class TelegramShoutoutBot:
         # Not handled so far: voice, document, audio, video, contact, venue, location, video_note, game
 
     @staticmethod
-    def create_channel_list(channels: Iterable) -> str:
+    def create_channel_list(channels: Iterable[Channel]) -> str:
         answer = ""
         for channel in channels:
             answer += "{0} - {1}\n".format(channel.name, channel.description)
         return answer
 
     @staticmethod
-    def create_channel_keyboard(channels: Iterable, cancel_callback_data: str) -> InlineKeyboardMarkup:
+    def create_channel_keyboard(channels: Iterable[Channel], cancel_callback_data: str) -> InlineKeyboardMarkup:
         keyboard = []
         for channel in channels:
             button_text = "{0} - {1}\n".format(channel.name, channel.description)
@@ -546,6 +550,12 @@ class TelegramShoutoutBot:
         elif update.callback_query:
             requested_channel_id = int(context.match.group(1))
             return session.get_channel_by_id(requested_channel_id)
+
+    def get_accessible_channels(self, session: MyDatabaseSession, user: User) -> List[Channel]:
+        all_channels: List[Channel] = session.get_channels()
+        predicate: Callable[[Channel], bool] = lambda channel: self.ldap_access.check_filter(user.ldap_account,
+                                                                                             channel.ldap_filter)
+        return list(filter(predicate, all_channels))
 
     def __init__(self):
         from telegram.utils.request import Request

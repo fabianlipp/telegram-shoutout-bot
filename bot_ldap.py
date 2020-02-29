@@ -3,6 +3,7 @@ from ldap3 import Server, Connection, RESTARTABLE, SYNC
 
 class LdapAccess:
     base_group_filter = None
+    conn = None
 
     def __init__(self, server_url, user, password, base_group_filter):
         self.base_group_filter = base_group_filter

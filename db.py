@@ -1,5 +1,6 @@
 import time
 from contextlib import contextmanager
+from typing import List
 
 from sqlalchemy import Table, Column, Integer, String, Boolean, ForeignKey, event, create_engine
 import sqlalchemy.engine
@@ -120,7 +121,7 @@ class MyDatabaseSession:
     def get_channel_by_id(self, channel_id: int):
         return self.session.query(Channel).filter(Channel.id == channel_id).first()
 
-    def get_channels(self):
+    def get_channels(self) -> List[Channel]:
         return self.session.query(Channel).all()
 
     def get_unsubscribed_channels(self, chat_id: int):
