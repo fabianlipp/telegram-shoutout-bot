@@ -474,7 +474,7 @@ class TelegramShoutoutBot:
 
     @staticmethod
     def message_valid(message: Message):
-        if message.text or message.photo or message.sticker:
+        if message.text or message.photo or message.sticker or message.video:
             return True
         else:
             return False
@@ -483,6 +483,7 @@ class TelegramShoutoutBot:
     def resend_message(chat_id, message: Message, context: CallbackContext):
         # The following case distinction is similar to the one in
         # https://github.com/91DarioDev/forwardscoverbot/blob/master/forwardscoverbot/messages.py
+        caption = message.caption
         if message.text:
             context.bot.send_message(
                 chat_id=chat_id,
@@ -493,6 +494,7 @@ class TelegramShoutoutBot:
             context.bot.send_photo(
                 chat_id=chat_id,
                 photo=media,
+                caption=caption,
                 parse_mode=ParseMode.HTML
             )
         elif message.sticker:
@@ -501,7 +503,17 @@ class TelegramShoutoutBot:
                 chat_id=chat_id,
                 sticker=media
             )
-        # Not handled so far: voice, document, audio, video, contact, venue, location, video_note, game
+        elif message.video:
+            media = message.video.file_id
+            duration = message.video.duration
+            context.bot.send_video(
+                chat_id=chat_id,
+                video=media,
+                duration=duration,
+                caption=caption,
+                parse_mode=ParseMode.HTML
+            )
+        # Not handled so far: voice, document, audio, contact, venue, location, video_note, game
 
     @staticmethod
     def create_channel_list(channels: Iterable[Channel]) -> str:
