@@ -16,3 +16,4 @@ class BotConf:
     url_libs = '/libs/'
     url_host = 'https://example.com'
     url_path = '/telegram/'
+    url_impressum = 'https://www.example.com/impressum.html'

@@ -66,6 +66,7 @@ GENERAL_COMMANDS = OrderedDict(
     [('start', 'Shoutout starten'),
      ('stop', 'Alle Nachrichten deaktivieren, Daten werden vom Server gelöscht'),
      ('help', 'Diese Hilfenachricht anzeigen'),
+     ('impressum', 'Impressum anzeigen'),
      ('subscribe', 'Zusätzlichen Kanal abonnieren'),
      ('unsubscribe', 'Einzelnen Kanal abbestellen')
      ]
@@ -116,6 +117,11 @@ class TelegramShoutoutBot:
         for key, val in ADMIN_COMMANDS.items():
             answer += "/{0} - {1}\n".format(key, val)
         context.bot.send_message(chat_id=chat_id, text=answer)
+
+    def cmd_impressum(self, update: Update, context: CallbackContext):
+        self.remove_all_inline_keyboards(update, context)
+        answer = "Das Impressum für diesen Dienst befindet sich auf " + BotConf.url_impressum
+        context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
 
     def cmd_admin(self, update: Update, context: CallbackContext):
         self.remove_all_inline_keyboards(update, context)
@@ -571,6 +577,7 @@ class TelegramShoutoutBot:
                     CommandHandler('start', self.cmd_start),
                     CommandHandler('stop', self.cmd_stop),
                     CommandHandler('help', self.cmd_help),
+                    CommandHandler('impressum', self.cmd_impressum),
                     CommandHandler('admin', self.cmd_admin),
                     CommandHandler('register', self.cmd_register),
                     CommandHandler('unregister', self.cmd_unregister),
