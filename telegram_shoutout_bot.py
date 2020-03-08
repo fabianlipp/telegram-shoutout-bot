@@ -7,7 +7,7 @@ import traceback
 import warnings
 from collections import OrderedDict
 from queue import Queue, Empty
-from typing import Iterable, List, Any, Iterator, Callable
+from typing import Iterable, List, Callable
 
 import telegram.bot
 from telegram import Message, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
@@ -341,19 +341,22 @@ class TelegramShoutoutBot:
             if user is None:
                 context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
                 return ConversationHandler.END
-            elif channel.name in user.channels:
-                answer = "Du hast diesen Kanal bereits abonniert."
-                context.bot.send_message(chat_id=chat_id, text=answer)
-                return ConversationHandler.END
             elif channel is not None:
-                session.add_channel(chat_id, channel)
-                userLogger.info("User {0} subscribed channel {1}.".format(chat_id, channel.name))
-                answer = "Kanal abonniert: " + channel.name
-                context.bot.send_message(chat_id=chat_id, text=answer)
-                return ConversationHandler.END
+                if channel.name in user.channels:
+                    answer = "Du hast diesen Kanal bereits abonniert."
+                    context.bot.send_message(chat_id=chat_id, text=answer)
+                    return ConversationHandler.END
+                else:
+                    session.add_channel(chat_id, channel)
+                    userLogger.info("User {0} subscribed channel {1}.".format(chat_id, channel.name))
+                    answer = "Kanal abonniert: " + channel.name
+                    context.bot.send_message(chat_id=chat_id, text=answer)
+                    return ConversationHandler.END
             else:
                 answer = "Kanal nicht vorhanden. Bitte anderen Kanal eingeben."
-                context.bot.send_message(chat_id=chat_id, text=answer)
+                unsubscribed_channels = session.get_unsubscribed_channels(chat_id)
+                reply_markup = TelegramShoutoutBot.create_channel_keyboard(unsubscribed_channels, CB_SUBSCRIBE_CANCEL)
+                context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
                 # no return statement (stay in same state)
 
     def cancel_subscribe(self, update: Update, context: CallbackContext):
@@ -534,7 +537,7 @@ class TelegramShoutoutBot:
 
     @staticmethod
     def get_message_user_not_known() -> str:
-        return "Dein Telegram-Account ist nicht bekannt." \
+        return "Dein Telegram-Account ist nicht bekannt. " \
                "Um mit dem Bot zu kommunizieren, musst du zunächst /start eingeben."
 
     def remove_all_inline_keyboards(self, update: Update, context: CallbackContext):
