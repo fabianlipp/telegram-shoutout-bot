@@ -135,7 +135,7 @@ class MyDatabase:
     db_engine = None
 
     def __init__(self, database_url):
-        self.db_engine = create_engine(database_url, echo=False)
+        self.db_engine = create_engine(database_url, pool_pre_ping=True, echo=False)
         try:
             # TODO: Check whether schema is correct if it already exists
             Base.metadata.create_all(self.db_engine)
