@@ -1,5 +1,7 @@
-/telegram_shoutout_bot_conf.py
+/bot/telegram_shoutout_bot_conf.py
 .idea
 __pycache__
 /testdb.sqlite
 *.log
+venv
+flask_session
