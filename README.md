@@ -58,7 +58,8 @@ The easiest way to deploy the container is to use docker-compose.
 In the following, we present an example configuration file.
 You need to adapt the paths (```/path/to/*```) in the volume section:
 With the first line you can choose a directory to store the log files, with the second file you specify a configuration
-file to use (which is read in entrypoint script when starting the container).
+file to use (which is read in entrypoint script when starting the container). The configuration file can be mounted
+readonly.
 ```yaml
 version: '3.5'
 
@@ -72,7 +73,7 @@ services:
       - 127.0.0.1:10050:8000
     volumes:
       - /path/to/log:/log
-      - /path/to/telegram_shoutout_bot_conf.py:/config/telegram_shoutout_bot_conf.py
+      - /path/to/telegram_shoutout_bot_conf.py:/config/telegram_shoutout_bot_conf.py:ro
     restart: unless-stopped
 
 networks:
