@@ -8,6 +8,7 @@ RUN apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev openssl-dev
  && apk add --no-cache supervisor
 COPY bot /app
 COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 COPY docker/supervisord.conf /etc/supervisor.d/telegram-shoutout-bot.ini
 WORKDIR /app
 EXPOSE 8000
