@@ -1,5 +1,5 @@
 FROM python:alpine3.7
-COPY requirements.txt /
+COPY bot/requirements.txt /
 RUN apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev openssl-dev \
  && pip install -r /requirements.txt \
  && pip install pymysql \

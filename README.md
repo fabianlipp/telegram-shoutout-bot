@@ -8,13 +8,14 @@ Copy `telegram_shoutout_bot_conf.py.template` to `telegram_shoutout_bot_conf.py`
 You need to obtain a `bot_token` by chatting with [BotFather](https://t.me/BotFather).
 
 
-## Needed dependencies
+## Deploying without Docker
 
 
 ### Python
 
 ```
-pip3 install ldap3 python-telegram-bot sqlalchemy
+pip3 install -r bot/requirements.txt
+pip3 install pymysql # if you use a MySQL database
 ```
 
 (virtual environment can be used to prevent conflicts)
@@ -55,38 +56,14 @@ docker build --tag telegram-shoutout-bot -f docker/Dockerfile .
 
 ### Deploying image
 The easiest way to deploy the container is to use docker-compose.
+```shell script
+cp docker-compose.yml{.template,}
+```
 In the following, we present an example configuration file.
 You need to adapt the paths (```/path/to/*```) in the volume section:
 With the first line you can choose a directory to store the log files, with the second file you specify a configuration
 file to use (which is read in entrypoint script when starting the container). The configuration file can be mounted
 readonly.
-```yaml
-version: '3.5'
-
-services:
-  ptb-test:
-    image: telegram-shoutout-bot
-    container_name: tsb
-    networks:
-      - telegram-network
-    ports:
-      - 127.0.0.1:10050:8000
-    volumes:
-      - /path/to/log:/log
-      - /path/to/telegram_shoutout_bot_conf.py:/config/telegram_shoutout_bot_conf.py:ro
-    restart: unless-stopped
-
-networks:
-  telegram-network:
-    driver: bridge
-    driver_opts:
-      com.docker.network.bridge.name: "telegram-net"
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.18.1.0/24
-    name: telegram-network
-```
 
 ### Database usage
 The docker image contains the pymysql package for Python so that connections to mysql databases are possible.

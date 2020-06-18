@@ -1,0 +1,25 @@
+version: '3.5'
+
+services:
+  ptb-test:
+    image: telegram-shoutout-bot
+    container_name: tsb
+    networks:
+      - telegram-network
+    ports:
+      - 127.0.0.1:10050:8000
+    volumes:
+      - /path/to/log:/log
+      - /path/to/telegram_shoutout_bot_conf.py:/config/telegram_shoutout_bot_conf.py:ro
+    restart: unless-stopped
+
+networks:
+  telegram-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: "telegram-net"
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.1.0/24
+    name: telegram-network
