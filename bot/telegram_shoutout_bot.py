@@ -96,7 +96,9 @@ class TelegramShoutoutBot:
         chat = update.effective_chat
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
             session.add_user(chat.id, chat.username, chat.first_name, chat.last_name)
-            context.bot.send_message(chat_id=chat.id, text="Herzlich willkommen!")
+            context.bot.send_message(chat_id=chat.id, parse_mode=ParseMode.MARKDOWN,
+                                     text='Herzlich willkommen!\n\nÜber /subscribe kannst du jetzt Kanäle abbonieren.\n'
+                                          'Mit /help werden dir alle Befehle angezeigt.')
 
     def cmd_stop(self, update: Update, context: CallbackContext):
         self.remove_all_inline_keyboards(update, context)
@@ -292,7 +294,7 @@ class TelegramShoutoutBot:
             user = session.get_user_by_chat_id(chat.id)
             channel = session.get_channel_by_name(channel_name)
             if user is None or user.ldap_account is None or not self.ldap_access.check_usergroup(user.ldap_account) or \
-               not self.ldap_access.check_filter(user.ldap_account, channel.ldap_filter):
+                    not self.ldap_access.check_filter(user.ldap_account, channel.ldap_filter):
                 adminLogger.warning("Stopped message sending because of insufficient permissions.")
                 answer = "Du hast keine Berechtigung zum Nachrichtenversand."
                 context.bot.send_message(chat_id=chat.id, text=answer)
@@ -600,7 +602,7 @@ class TelegramShoutoutBot:
         with warnings.catch_warnings():
             # We filter out a certain warning message by python-telegram-bot here
             warnings.filterwarnings('ignore', "If 'per_message=False', 'CallbackQueryHandler' will not be "
-                                    "tracked for every message.")
+                                              "tracked for every message.")
             conversation_handler = ConversationHandler(
                 entry_points=[
                     CommandHandler('start', self.cmd_start),
@@ -662,6 +664,7 @@ class TelegramShoutoutBot:
 
 class MQBot(telegram.bot.Bot):
     """A subclass of Bot which delegates send method handling to MQ"""
+
     def __init__(self, *args, is_queued_def=True, mqueue=None, keyboard_message_queue=None, **kwargs):
         super(MQBot, self).__init__(*args, **kwargs)
         # below 2 attributes should be provided for decorator usage
