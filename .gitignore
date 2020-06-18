@@ -1,7 +1,10 @@
-/bot/telegram_shoutout_bot_conf.py
 .idea
 __pycache__
+docker-compose.yml
 /testdb.sqlite
+/database
+telegram_shoutout_bot_conf.py
 *.log
+/log
 venv
 flask_session
