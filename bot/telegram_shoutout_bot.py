@@ -22,7 +22,6 @@ from db import my_session_scope
 from telegram_shoutout_bot_conf import BotConf
 import db
 import bot_ldap
-from senddata import SendData
 
 # Logging
 logger = logging.getLogger(__name__)
@@ -78,6 +77,11 @@ ADMIN_COMMANDS = OrderedDict(
      ('send', 'Nachricht an Abonnenten senden')
      ]
 )
+
+
+class SendData:
+    channel = None
+    messages = None
 
 
 class TelegramShoutoutBot:
