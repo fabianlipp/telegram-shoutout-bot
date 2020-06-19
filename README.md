@@ -4,7 +4,7 @@ This python script will enable a telegram bot to handle subscriptions and shouto
 
 ## Usage
 
-Copy `telegram_shoutout_bot_conf.py.template` to `telegram_shoutout_bot_conf.py` and adapt the settings.
+Copy `cp bot/conf.py{.template,}` and adapt the settings.
 You need to obtain a `bot_token` by chatting with [BotFather](https://t.me/BotFather).
 
 
@@ -55,11 +55,7 @@ docker build --tag telegram-shoutout-bot -f docker/Dockerfile .
 ```
 
 ### Deploying image
-The easiest way to deploy the container is to use docker-compose.
-```shell script
-cp docker-compose.yml{.template,}
-```
-In the following, we present an example configuration file.
+The easiest way to deploy the container is to use docker-compose. Copy `cp docker-compose.yml{.template,}` the example configuration file.
 You need to adapt the paths (```/path/to/*```) in the volume section:
 With the first line you can choose a directory to store the log files, with the second file you specify a configuration
 file to use (which is read in entrypoint script when starting the container). The configuration file can be mounted

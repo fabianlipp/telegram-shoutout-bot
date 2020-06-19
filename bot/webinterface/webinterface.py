@@ -1,28 +1,28 @@
 from flask import Flask, g, request, render_template
 import logging
 import db
-import bot_ldap
-from telegram_shoutout_bot_conf import BotConf
+import ldap
+from conf import Conf
 
 # Log for web actions
 webLogger = logging.getLogger('TelegramShoutoutBot.web')
 webLogger.setLevel(logging.INFO)
-web_file_handler = logging.FileHandler(BotConf.web_log)
+web_file_handler = logging.FileHandler(Conf.web_log)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 web_file_handler.setFormatter(formatter)
 webLogger.addHandler(web_file_handler)
 
 app = Flask(__name__)
 
-my_database = db.MyDatabase(BotConf.database_url)
-ldap_access = bot_ldap.LdapAccess(BotConf.ldap_server, BotConf.ldap_user,
-                                  BotConf.ldap_password, BotConf.ldap_base_group_filter)
+my_database = db.MyDatabase(Conf.database_url)
+ldap_access = ldap.LdapAccess(Conf.ldap_server, Conf.ldap_user,
+                              Conf.ldap_password, Conf.ldap_base_group_filter)
 
 
 @app.before_request
 def before_request():
-    g.url_libs = BotConf.url_libs
-    g.url_path = BotConf.url_path
+    g.url_libs = Conf.url_libs
+    g.url_path = Conf.url_path
 
 
 @app.route('/')
@@ -41,7 +41,7 @@ def register_login(chat_id):
     token = request.form['token']
     username = request.form['username']
     password = request.form['password']
-    ldap_account = BotConf.ldap_username_template.format(username)
+    ldap_account = Conf.ldap_username_template.format(username)
     if not ldap_access.check_credentials(ldap_account, password):
         return render_template('register_login_fail.html', reason="ldap", chat_id=chat_id, token=token)
     with db.my_session_scope(my_database) as session:  # type: db.MyDatabaseSession

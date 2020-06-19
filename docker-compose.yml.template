@@ -10,7 +10,7 @@ services:
       - 127.0.0.1:10050:8000
     volumes:
       - /path/to/log:/log
-      - /path/to/telegram_shoutout_bot_conf.py:/config/telegram_shoutout_bot_conf.py:ro
+      - /path/to/conf.py:/config/conf.py:ro
     restart: unless-stopped
 
 networks:

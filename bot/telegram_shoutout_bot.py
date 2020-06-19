@@ -19,14 +19,14 @@ from telegram.ext import MessageHandler, Filters
 
 from db import MyDatabaseSession, Channel, User
 from db import my_session_scope
-from telegram_shoutout_bot_conf import BotConf
+from conf import Conf
 import db
-import bot_ldap
+import ldap
 
 # Logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-file_handler = logging.FileHandler(BotConf.error_log)
+file_handler = logging.FileHandler(Conf.error_log)
 stream_handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
@@ -36,13 +36,13 @@ logger.addHandler(stream_handler)
 # Log for admin actions
 adminLogger = logging.getLogger('TelegramShoutoutBot.admin')
 adminLogger.setLevel(logging.INFO)
-admin_file_handler = logging.FileHandler(BotConf.admin_log)
+admin_file_handler = logging.FileHandler(Conf.admin_log)
 admin_file_handler.setFormatter(formatter)
 adminLogger.addHandler(admin_file_handler)
 # Log for admin actions
 userLogger = logging.getLogger('TelegramShoutoutBot.user')
 userLogger.setLevel(logging.INFO)
-user_file_handler = logging.FileHandler(BotConf.user_log)
+user_file_handler = logging.FileHandler(Conf.user_log)
 user_file_handler.setFormatter(formatter)
 userLogger.addHandler(user_file_handler)
 
@@ -86,7 +86,7 @@ class SendData:
 
 class TelegramShoutoutBot:
     my_database: db.MyDatabase = None
-    ldap_access: bot_ldap.LdapAccess = None
+    ldap_access: ldap.LdapAccess = None
     # We use the following queue to store chat ids and message ids of messages containing inline keyboards, so that
     # those can be deleted when not needed anymore (as they could have unwanted side effects). This queue has to be
     # thread-safe as it is filled by the asynchronous calls triggered by the message queue.
@@ -126,7 +126,7 @@ class TelegramShoutoutBot:
 
     def cmd_impressum(self, update: Update, context: CallbackContext):
         self.remove_all_inline_keyboards(update, context)
-        answer = "Das Impressum für diesen Dienst befindet sich auf " + BotConf.url_impressum
+        answer = "Das Impressum für diesen Dienst befindet sich auf " + Conf.url_impressum
         context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
 
     def cmd_admin(self, update: Update, context: CallbackContext):
@@ -167,7 +167,7 @@ class TelegramShoutoutBot:
                 user.ldap_register_token = token
                 session.commit()
                 answer = "Bitte klicke auf den folgenden Link:\n" \
-                         "{0}{1}register/{2}?token={3}".format(BotConf.url_host, BotConf.url_path, chat_id, token)
+                         "{0}{1}register/{2}?token={3}".format(Conf.url_host, Conf.url_path, chat_id, token)
         context.bot.send_message(chat_id=chat_id, text=answer)
 
     def cmd_unregister(self, update: Update, context: CallbackContext):
@@ -476,7 +476,7 @@ class TelegramShoutoutBot:
         text = "Hey.\n The error <code>{0}</code> happened{1}. The full traceback:\n\n<code>{2}" \
                "</code>".format(context.error, payload, trace)
         # and send it to the dev(s)
-        for dev_id in BotConf.bot_devs:
+        for dev_id in Conf.bot_devs:
             context.bot.send_message(dev_id, "An error occured in the bot and was logged.")
         # we raise the error again, so the logger module catches it. If you don't use the logger module, use it.
         logger.warning('Update "%s" caused error "%s".\nFull information: %s', update, context.error, text)
@@ -585,16 +585,16 @@ class TelegramShoutoutBot:
     def __init__(self):
         from telegram.utils.request import Request
 
-        self.my_database = db.MyDatabase(BotConf.database_url)
+        self.my_database = db.MyDatabase(Conf.database_url)
 
-        self.ldap_access = bot_ldap.LdapAccess(BotConf.ldap_server, BotConf.ldap_user,
-                                               BotConf.ldap_password, BotConf.ldap_base_group_filter)
+        self.ldap_access = ldap.LdapAccess(Conf.ldap_server, Conf.ldap_user,
+                                           Conf.ldap_password, Conf.ldap_base_group_filter)
 
         # recommended values for production: 29/1017
         q = mq.MessageQueue(all_burst_limit=29, all_time_limit_ms=1017)
         # set connection pool size for bot
         request = Request(con_pool_size=8)
-        mqbot = MQBot(token=BotConf.bot_token,
+        mqbot = MQBot(token=Conf.bot_token,
                       request=request,
                       mqueue=q,
                       keyboard_message_queue=self.keyboard_message_queue)

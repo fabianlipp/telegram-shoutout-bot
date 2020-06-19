@@ -1,4 +1,4 @@
-class BotConf:
+class Conf:
     bot_token = '123456789:shiec2nai3joy3alee7ohduz3eiH5nahb7yu'
     database_url = 'sqlite:////database/testdb.sqlite'
     # Variant for MySQL:
