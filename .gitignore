@@ -1,11 +1,6 @@
-*.log
 .idea
-/bot/conf.py
-/bot/telegram_shoutout_bot_conf.py
-/database
-/docker-compose.yml
-/log
-/testdb.sqlite
 __pycache__
 flask_session
 venv
+/instances/*
+!/instances/sample/

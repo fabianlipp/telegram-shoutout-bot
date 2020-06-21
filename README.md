@@ -2,20 +2,17 @@
 
 This python script will enable a telegram bot to handle subscriptions and shoutouts in one or multiple channels.
 
-## Usage
-
-Copy `cp bot/conf.py{.template,}` and adapt the settings.
-You need to obtain a `bot_token` by chatting with [BotFather](https://t.me/BotFather).
+You need to obtain a `bot_token` by chatting with [BotFather](https://t.me/BotFather) that is entered in your `conf.py`.
 
 
 ## Deploying without Docker
-
 
 ### Python
 
 ```
 pip3 install -r bot/requirements.txt
 pip3 install pymysql # if you use a MySQL database
+cp instances/sample/conf.py bot/
 ```
 
 (virtual environment can be used to prevent conflicts)
@@ -46,6 +43,7 @@ Presumed your URL is https://example.com/telegram/ the apache configuration need
 </VirtualHost>
 ```
 
+
 ## Deploying using Docker
 
 ### Building image
@@ -55,11 +53,13 @@ docker build --tag telegram-shoutout-bot -f docker/Dockerfile .
 ```
 
 ### Deploying image
-The easiest way to deploy the container is to use docker-compose. Copy `cp docker-compose.yml{.template,}` the example configuration file.
-You need to adapt the paths (```/path/to/*```) in the volume section:
-With the first line you can choose a directory to store the log files, with the second file you specify a configuration
-file to use (which is read in entrypoint script when starting the container). The configuration file can be mounted
-readonly.
+The easiest way to deploy the container is to copy the example configuration directory, adapt the configuration and start the container:
+```shell script
+cp -r instances/{sample,botty}
+cd instaces/botty
+editor conf.py
+docker-compose up -d --build
+```
 
 ### Database usage
 The docker image contains the pymysql package for Python so that connections to mysql databases are possible.
