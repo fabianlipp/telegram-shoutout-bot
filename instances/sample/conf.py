@@ -2,7 +2,7 @@ class Conf:
     bot_token = '123456789:shiec2nai3joy3alee7ohduz3eiH5nahb7yu'
     database_url = 'sqlite:////database/testdb.sqlite'
     # Variant for MySQL:
-    # database_url = 'mysql+pymysql://user:password@host/database'
+    # database_url = 'mysql+pymysql://user:password@172.18.1.1/database'
     ldap_base_group_filter = "(&(objectclass=person)(memberOf=cn=telegram,ou=group,dc=example,dc=com))"
     ldap_server = 'ldaps://example.com'
     ldap_user = "userid=telegram,ou=user,dc=example,dc=com"

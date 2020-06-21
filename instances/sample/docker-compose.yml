@@ -1,18 +1,21 @@
 version: '3.5'
 
 services:
-  ptb-test:
+  telegram-shoutout-bot:
+    build:
+      context: ../../
+      dockerfile: docker/Dockerfile
     image: telegram-shoutout-bot
-    container_name: tsb
+    container_name: sample
     networks:
       - telegram-network
     ports:
-      - 127.0.0.1:10050:8000
+      - 127.0.0.1:9001:8000
     volumes:
-      - /path/to/conf.py:/config/conf.py:ro
+      - ./conf.py:/config/conf.py:ro
       # for sqlite
-      #- /path/to/database:/database
-      - /path/to/log:/log
+      #- ./database:/database
+      - ./log:/log
     restart: unless-stopped
 
 networks:
@@ -24,4 +27,4 @@ networks:
       driver: default
       config:
         - subnet: 172.18.1.0/24
-    name: telegram-network
+          name: telegram-network

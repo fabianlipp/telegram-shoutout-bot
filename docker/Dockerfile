@@ -12,5 +12,5 @@ RUN chmod +x /entrypoint.sh
 COPY docker/supervisord.conf /etc/supervisor.d/telegram-shoutout-bot.ini
 WORKDIR /app
 EXPOSE 8000
-VOLUME /log /database /config/conf.py
+#VOLUME /log /database /config/conf.py
 ENTRYPOINT /entrypoint.sh
