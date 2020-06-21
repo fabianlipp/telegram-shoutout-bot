@@ -2,5 +2,6 @@
 __pycache__
 flask_session
 venv
+/bot/conf.py
 /instances/*
 !/instances/sample/
