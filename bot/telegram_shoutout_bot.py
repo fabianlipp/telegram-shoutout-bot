@@ -12,16 +12,17 @@ from typing import Iterable, List, Callable
 import telegram.bot
 from telegram import Message, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import Update
-from telegram.ext import messagequeue as mq, CallbackQueryHandler
-from telegram.ext import ConversationHandler, CallbackContext
 from telegram.ext import CommandHandler
+from telegram.ext import ConversationHandler, CallbackContext
 from telegram.ext import MessageHandler, Filters
+from telegram.ext import messagequeue as mq, CallbackQueryHandler
 
-from db import MyDatabaseSession, Channel, User
-from db import my_session_scope
-from conf import Conf
 import db
 import ldap
+from conf import Conf
+from db import MyDatabaseSession, Channel, User
+from db import my_session_scope
+from my_message import MyMessage
 
 # Logging
 logger = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ ADMIN_COMMANDS = OrderedDict(
 
 class SendData:
     channel = None
-    messages = None
+    messages: List[MyMessage] = None
 
 
 class TelegramShoutoutBot:
@@ -244,8 +245,8 @@ class TelegramShoutoutBot:
         send_data = context.user_data["send"]  # type: SendData
         if send_data.messages is None:
             send_data.messages = []
-        if TelegramShoutoutBot.message_valid(update.message):
-            send_data.messages.append(update.message)
+        if TelegramShoutoutBot.message_valid(update.message):  # TODO: New handling for message_valid?
+            send_data.messages.append(MyMessage.get_mymessage_object(update.message))
             answer = "Weitere Nachrichten anfügen, abschließen mit /done oder Abbrechen mit /cancel."
             keyboard = [[InlineKeyboardButton("Done", callback_data=CB_SEND_DONE)],
                         [InlineKeyboardButton("Cancel", callback_data=CB_SEND_CANCEL)]]
@@ -271,8 +272,8 @@ class TelegramShoutoutBot:
         context.bot.send_message(chat_id=chat_id, text=answer)
         answer = "Kanalname: {0}".format(send_data.channel)
         context.bot.send_message(chat_id=chat_id, text=answer)
-        for message in send_data.messages:  # type: Message
-            TelegramShoutoutBot.resend_message(update.effective_chat.id, message, context)
+        for message in send_data.messages:
+            message.send(update.effective_chat.id, context.bot)
 
         # Message asking for confirmation
         answer = "Versand bestätigen mit /confirm oder Abbrechen mit /cancel."
@@ -307,7 +308,7 @@ class TelegramShoutoutBot:
             for user in session.get_users():
                 if channel_name in user.channels:
                     for message in send_data.messages:
-                        TelegramShoutoutBot.resend_message(user.chat_id, message, context)
+                        message.send(user.chat_id, context.bot)
             return ConversationHandler.END
 
     def cancel_send(self, update: Update, context: CallbackContext):
@@ -487,42 +488,6 @@ class TelegramShoutoutBot:
             return True
         else:
             return False
-
-    @staticmethod
-    def resend_message(chat_id, message: Message, context: CallbackContext):
-        # The following case distinction is similar to the one in
-        # https://github.com/91DarioDev/forwardscoverbot/blob/master/forwardscoverbot/messages.py
-        caption = message.caption
-        if message.text:
-            context.bot.send_message(
-                chat_id=chat_id,
-                text=message.text_html,
-                parse_mode=ParseMode.HTML)
-        elif message.photo:
-            media = message.photo[-1].file_id
-            context.bot.send_photo(
-                chat_id=chat_id,
-                photo=media,
-                caption=caption,
-                parse_mode=ParseMode.HTML
-            )
-        elif message.sticker:
-            media = message.sticker.file_id
-            context.bot.send_sticker(
-                chat_id=chat_id,
-                sticker=media
-            )
-        elif message.video:
-            media = message.video.file_id
-            duration = message.video.duration
-            context.bot.send_video(
-                chat_id=chat_id,
-                video=media,
-                duration=duration,
-                caption=caption,
-                parse_mode=ParseMode.HTML
-            )
-        # Not handled so far: voice, document, audio, contact, venue, location, video_note, game
 
     @staticmethod
     def create_channel_list(channels: Iterable[Channel]) -> str:
