@@ -80,6 +80,11 @@ ADMIN_COMMANDS = OrderedDict(
 
 
 class SendData:
+    # botm stands for bot message and contains messages that were sent by the bot and maybe need to be
+    # edited/deleted later
+    botm_choose_channel = None
+    botm_add_messages = None
+    botm_confirmation = None
     channel = None
     messages = None
 
@@ -100,8 +105,9 @@ class TelegramShoutoutBot:
         chat = update.effective_chat
         with my_session_scope(self.my_database) as session:  # type: MyDatabaseSession
             session.add_user(chat.id, chat.username, chat.first_name, chat.last_name)
-            context.bot.send_message(chat_id=chat.id, parse_mode=ParseMode.MARKDOWN,
-                                     text='Herzlich willkommen!\n\nÜber /subscribe kannst du jetzt Kanäle abbonieren.\n'
+            context.bot.send_message(chat_id=chat.id, parse_mode=ParseMode.HTML,
+                                     text='<b>Herzlich willkommen!</b>\n\n'
+                                          'Mittels /subscribe kannst du jetzt zusätzliche Kanäle abbonieren.\n'
                                           'Mit /help werden dir alle Befehle angezeigt.')
 
     def cmd_stop(self, update: Update, context: CallbackContext):
@@ -116,13 +122,13 @@ class TelegramShoutoutBot:
     def cmd_help(self, update: Update, context: CallbackContext):
         self.remove_all_inline_keyboards(update, context)
         chat_id = update.effective_chat.id
-        answer = "Verfügbare Kommandos:\n"
+        answer = "<b>Verfügbare Kommandos:</b>\n"
         for key, val in GENERAL_COMMANDS.items():
             answer += "/{0} - {1}\n".format(key, val)
-        answer += "\nBefehle für Administratoren:\n"
+        answer += "\n<b>Befehle für Administratoren:</b>\n"
         for key, val in ADMIN_COMMANDS.items():
             answer += "/{0} - {1}\n".format(key, val)
-        context.bot.send_message(chat_id=chat_id, text=answer)
+        context.bot.send_message(chat_id=chat_id, text=answer, parse_mode=ParseMode.HTML)
 
     def cmd_impressum(self, update: Update, context: CallbackContext):
         self.remove_all_inline_keyboards(update, context)
@@ -137,19 +143,19 @@ class TelegramShoutoutBot:
             if user is None:
                 answer = self.get_message_user_not_known()
             elif user.ldap_account is None:
-                answer = "Du hast keinen DPSG-Account mit deinem Telegram-Zugang verbunden."
+                answer = "Du hast <i>keinen</i> DPSG-Account mit deinem Telegram-Zugang verbunden."
             elif self.ldap_access.check_usergroup(user.ldap_account):
                 accessible_channels: List[Channel] = self.get_accessible_channels(session, user)
                 answer = "Du hast einen DPSG-Account mit deinem Telegram-Zugang verbunden " \
-                         "und hast Admin-Rechte in Telegram.\n" \
+                         "und hast Admin-Rechte in Telegram.\n\n" \
                          "Du kannst derzeit die folgenden Kanäle beschreiben: \n"
                 answer += TelegramShoutoutBot.create_channel_list(accessible_channels)
-                answer += "Falls du Zugang zu weiteren Kanälen brauchst, wende dich ans Webteam."
+                answer += "\nFalls du Zugang zu weiteren Kanälen brauchst, wende dich ans Webteam."
             else:
                 answer = "Du hast einen DPSG-Account mit deinem Telegram-Zugang verbunden, " \
                          "hast aber noch keine Admin-Rechte in Telegram.\n" \
                          "Wende dich mit deiner Chat-ID {0} ans Webteam um Admin-Rechte zu erhalten.".format(chat_id)
-            context.bot.send_message(chat_id=chat_id, text=answer)
+            context.bot.send_message(chat_id=chat_id, text=answer, parse_mode=ParseMode.HTML)
 
     def cmd_register(self, update: Update, context: CallbackContext):
         self.remove_all_inline_keyboards(update, context)
@@ -197,11 +203,17 @@ class TelegramShoutoutBot:
                 context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
                 return ConversationHandler.END
             elif user.ldap_account is not None and self.ldap_access.check_usergroup(user.ldap_account):
+                send_data: SendData = SendData()
+                context.user_data["send"] = send_data
                 accessible_channels: List[Channel] = self.get_accessible_channels(session, user)
-                answer = "Kanal eingeben, an den die Nachricht gesendet werden soll.\n" \
+                answer = "<b>Nachricht senden</b>\n\n" \
+                         "Bitte Kanal eingeben, an den die Nachricht gesendet werden soll.\n\n" \
                          "Verfügbare Kanäle:\n" + TelegramShoutoutBot.create_channel_list(accessible_channels)
                 reply_markup = TelegramShoutoutBot.create_channel_keyboard(accessible_channels, CB_SEND_CANCEL)
-                context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
+                send_data.botm_choose_channel = context.bot.send_message_keyboard(chat_id=chat_id,
+                                                                                  text=answer,
+                                                                                  reply_markup=reply_markup,
+                                                                                  parse_mode=ParseMode.HTML)
                 return SEND_CHANNEL
             else:
                 answer = "Du benötigst Admin-Rechte um Nachrichten zu verschicken."
@@ -225,10 +237,12 @@ class TelegramShoutoutBot:
                 if channel.ldap_filter is None or len(channel.ldap_filter) == 0:
                     logger.warning("No LDAP filter configured for channel {0}. Denying access.".format(channel.name))
                 if self.ldap_access.check_filter(user.ldap_account, channel.ldap_filter):
-                    send_data = SendData()
-                    context.user_data["send"] = send_data
+                    send_data = context.user_data["send"]
                     send_data.channel = channel.name
-                    answer = "Nachricht eingeben, die gesendet werden soll."
+                    updated_text = "<b>Nachricht senden</b>\n\n" \
+                                   "Ausgewählter Kanal: <b>" + channel.name + "</b>"
+                    send_data.botm_choose_channel.result(10).edit_text(text=updated_text, parse_mode=ParseMode.HTML)
+                    answer = "Nachrichten eingeben, die gesendet werden soll."
                     context.bot.send_message(chat_id=chat_id, text=answer)
                     return SEND_MESSAGE
                 else:
@@ -246,11 +260,16 @@ class TelegramShoutoutBot:
             send_data.messages = []
         if TelegramShoutoutBot.message_valid(update.message):
             send_data.messages.append(update.message)
-            answer = "Weitere Nachrichten anfügen, abschließen mit /done oder Abbrechen mit /cancel."
-            keyboard = [[InlineKeyboardButton("Done", callback_data=CB_SEND_DONE)],
-                        [InlineKeyboardButton("Cancel", callback_data=CB_SEND_CANCEL)]]
+            if send_data.botm_add_messages is not None:
+                send_data.botm_add_messages.result(10).delete()
+                send_data.botm_add_messages = None
+            answer = "Du kannst jetzt weitere Nachrichten anfügen oder die eingegebenen Nachrichten senden."
+            keyboard = [[InlineKeyboardButton("Jetzt senden", callback_data=CB_SEND_DONE)],
+                        [InlineKeyboardButton("Abbrechen", callback_data=CB_SEND_CANCEL)]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
+            send_data.botm_add_messages = context.bot.send_message_keyboard(chat_id=chat_id,
+                                                                            text=answer,
+                                                                            reply_markup=reply_markup)
         else:
             answer = "Dieses Nachrichtenformat wird nicht unterstützt.\n" \
                      "Bitte neue Nachricht eingeben."
@@ -266,28 +285,32 @@ class TelegramShoutoutBot:
             context.bot.send_message(chat_id=chat_id, text=answer)
             return None
 
+        if send_data.botm_add_messages is not None:
+            send_data.botm_add_messages.result(10).delete()
+            send_data.botm_add_messages = None
         # Send saved data to user
-        answer = "Diese Daten sind gespeichert:"
-        context.bot.send_message(chat_id=chat_id, text=answer)
-        answer = "Kanalname: {0}".format(send_data.channel)
-        context.bot.send_message(chat_id=chat_id, text=answer)
+        answer = "Die folgenden Nachrichten sind gespeichert und werden versendet:\n" \
+                 "Ziel-Kanalname: <b>{0}</b>".format(send_data.channel)
+        context.bot.send_message(chat_id=chat_id, text=answer, parse_mode=ParseMode.HTML)
         for message in send_data.messages:  # type: Message
             TelegramShoutoutBot.resend_message(update.effective_chat.id, message, context)
 
         # Message asking for confirmation
-        answer = "Versand bestätigen mit /confirm oder Abbrechen mit /cancel."
-        keyboard = [[InlineKeyboardButton("Confirm", callback_data=CB_SEND_CONFIRM)],
-                    [InlineKeyboardButton("Cancel", callback_data=CB_SEND_CANCEL)]]
+        answer = "Bitte Versand bestätigen:"
+        keyboard = [[InlineKeyboardButton("Bestätigen", callback_data=CB_SEND_CONFIRM)],
+                    [InlineKeyboardButton("Abbrechen", callback_data=CB_SEND_CANCEL)]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
+        send_data.botm_confirmation = context.bot.send_message_keyboard(chat_id=chat_id,
+                                                                        text=answer,
+                                                                        reply_markup=reply_markup)
         return SEND_CONFIRMATION
 
     def answer_confirm(self, update: Update, context: CallbackContext):
         self.remove_all_inline_keyboards(update, context)
         chat = update.effective_chat
-        answer = "Nachricht wird versendet."
-        context.bot.send_message(chat_id=chat.id, text=answer)
         send_data = context.user_data["send"]  # type: SendData
+        updated_text = "Nachrichten werden versendet"
+        send_data.botm_confirmation.result(10).edit_text(text=updated_text, parse_mode=ParseMode.HTML)
         channel_name = send_data.channel
         log_messages_strings = list(map(lambda msg: msg.__dict__, send_data.messages))
         log_message_format = "Sent message by user {0} ({1}, {2} {3}) to channel {4}: {5}"
@@ -304,10 +327,27 @@ class TelegramShoutoutBot:
                 context.bot.send_message(chat_id=chat.id, text=answer)
                 return ConversationHandler.END
             # Send message out to users
+            subscriber_count = 0
+            last_message = None
             for user in session.get_users():
                 if channel_name in user.channels:
+                    subscriber_count += 1
                     for message in send_data.messages:
-                        TelegramShoutoutBot.resend_message(user.chat_id, message, context)
+                        last_message = TelegramShoutoutBot.resend_message(user.chat_id, message, context)
+
+            if last_message is not None:
+                promise_result = last_message.result(60)
+                message_counter = len(send_data.messages) * subscriber_count
+                if promise_result is not None:
+                    answer = "Nachrichten erfolgreich zugestellt. " \
+                             "Es wurden insgesamt <b>{0}</b> Nachrichten an <b>{1}</b> Abonnenten versendet."
+                else:
+                    answer = "Nicht alle Nachrichten konnten innerhalb von 60 Sekunden zugestellt werden. " \
+                             "Es sollten insgesamt <b>{0}</b> an <b>{1}</b> Abonnenten Nachrichten versendet werden."
+                context.bot.send_message(chat_id=chat.id, text=answer.format(message_counter, subscriber_count),
+                                         parse_mode=ParseMode.HTML)
+                adminLogger.info(answer)
+
             return ConversationHandler.END
 
     def cancel_send(self, update: Update, context: CallbackContext):
@@ -329,13 +369,15 @@ class TelegramShoutoutBot:
             else:
                 subscribed_channels = user.channels.values()
                 unsubscribed_channels = session.get_unsubscribed_channels(chat_id)
-                answer = "Kanal eingeben, der abonniert werden soll oder Abbrechen mit /cancel.\n" \
-                         "Bereits abonnierte Kanäle:\n" + \
+                answer = "<b>Kanal abonnieren</b>\n\n" \
+                         "Kanal eingeben, der abonniert werden soll oder Abbrechen mit /cancel.\n\n" \
+                         "<b>Bereits abonnierte Kanäle:</b>\n" + \
                          TelegramShoutoutBot.create_channel_list(subscribed_channels) + \
-                         "Verfügbare Kanäle:\n" + \
+                         "\n<b>Verfügbare Kanäle:</b>\n" + \
                          TelegramShoutoutBot.create_channel_list(unsubscribed_channels)
                 reply_markup = TelegramShoutoutBot.create_channel_keyboard(unsubscribed_channels, CB_SUBSCRIBE_CANCEL)
-                context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
+                context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup,
+                                                  parse_mode=ParseMode.HTML)
                 return SUBSCRIBE_CHANNEL
 
     def answer_subscribe_channel(self, update: Update, context: CallbackContext):
@@ -355,8 +397,8 @@ class TelegramShoutoutBot:
                 else:
                     session.add_channel(chat_id, channel)
                     userLogger.info("User {0} subscribed channel {1}.".format(chat_id, channel.name))
-                    answer = "Kanal abonniert: " + channel.name
-                    context.bot.send_message(chat_id=chat_id, text=answer)
+                    answer = "Kanal <b>" + channel.name + "</b> wurde abonniert."
+                    context.bot.send_message(chat_id=chat_id, text=answer, parse_mode=ParseMode.HTML)
                     return ConversationHandler.END
             else:
                 answer = "Kanal nicht vorhanden. Bitte anderen Kanal eingeben."
@@ -383,10 +425,13 @@ class TelegramShoutoutBot:
             else:
                 # Filter out mandatory channels from list to select from
                 subscribed_channels = list(filter(lambda channel: not channel.mandatory, user.channels.values()))
-                answer = "Kanal eingeben, der deabonniert werden soll oder Abbrechen mit /cancel.\n" \
-                         "Bereits abonnierte Kanäle:\n" + TelegramShoutoutBot.create_channel_list(subscribed_channels)
+                answer = "<b>Kanal deabonnieren</b>\n\n"\
+                         "Kanal eingeben, der deabonniert werden soll oder Abbrechen mit /cancel.\n\n" \
+                         "<b>Bereits abonnierte Kanäle:</b>\n" + \
+                         TelegramShoutoutBot.create_channel_list(subscribed_channels)
                 reply_markup = TelegramShoutoutBot.create_channel_keyboard(subscribed_channels, CB_UNSUBSCRIBE_CANCEL)
-                context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup)
+                context.bot.send_message_keyboard(chat_id=chat_id, text=answer, reply_markup=reply_markup,
+                                                  parse_mode=ParseMode.HTML)
                 return UNSUBSCRIBE_CHANNEL
 
     def answer_unsubscribe_channel(self, update: Update, context: CallbackContext):
@@ -399,23 +444,24 @@ class TelegramShoutoutBot:
                 context.bot.send_message(chat_id=chat_id, text=self.get_message_user_not_known())
                 return ConversationHandler.END
             elif channel is None:
-                answer = "Kanal nicht vorhanden." \
+                answer = "Kanal nicht vorhanden. " \
                          "Bitte anderen Kanal eingeben oder Abbrechen mit /cancel."
                 context.bot.send_message(chat_id=chat_id, text=answer)
                 # no return statement (stay in same state)
             elif channel not in user.channels.values():
-                answer = "Kanal nicht abonniert." \
+                answer = "Kanal nicht abonniert. " \
                          "Bitte anderen Kanal eingeben oder Abbrechen mit /cancel."
                 context.bot.send_message(chat_id=chat_id, text=answer)
                 # no return statement (stay in same state)
             elif channel.mandatory:
                 answer = "Dieser Kanal ist immer abonniert und kann nicht abbestellt werden."
                 context.bot.send_message(chat_id=chat_id, text=answer)
+                # no return statement (stay in same state)
             else:
                 session.remove_channel(chat_id, channel)
                 userLogger.info("User {0} desubscribed channel {1}.".format(chat_id, channel.name))
-                answer = "Kanal deabonniert: " + channel.name
-                context.bot.send_message(chat_id=chat_id, text=answer)
+                answer = "Kanal <b>" + channel.name + "</b> wurde deabonniert."
+                context.bot.send_message(chat_id=chat_id, text=answer, parse_mode=ParseMode.HTML)
                 return ConversationHandler.END
 
     def cancel_unsubscribe(self, update: Update, context: CallbackContext):
@@ -494,13 +540,13 @@ class TelegramShoutoutBot:
         # https://github.com/91DarioDev/forwardscoverbot/blob/master/forwardscoverbot/messages.py
         caption = message.caption
         if message.text:
-            context.bot.send_message(
+            return context.bot.send_message(
                 chat_id=chat_id,
                 text=message.text_html,
                 parse_mode=ParseMode.HTML)
         elif message.photo:
             media = message.photo[-1].file_id
-            context.bot.send_photo(
+            return context.bot.send_photo(
                 chat_id=chat_id,
                 photo=media,
                 caption=caption,
@@ -508,14 +554,14 @@ class TelegramShoutoutBot:
             )
         elif message.sticker:
             media = message.sticker.file_id
-            context.bot.send_sticker(
+            return context.bot.send_sticker(
                 chat_id=chat_id,
                 sticker=media
             )
         elif message.video:
             media = message.video.file_id
             duration = message.video.duration
-            context.bot.send_video(
+            return context.bot.send_video(
                 chat_id=chat_id,
                 video=media,
                 duration=duration,
@@ -528,7 +574,7 @@ class TelegramShoutoutBot:
     def create_channel_list(channels: Iterable[Channel]) -> str:
         answer = ""
         for channel in channels:
-            answer += "{0} - {1}\n".format(channel.name, channel.description)
+            answer += "&#8226; <b>{0}</b> - {1}\n".format(channel.name, channel.description)
         return answer
 
     @staticmethod
@@ -538,7 +584,7 @@ class TelegramShoutoutBot:
             button_text = "{0} - {1}\n".format(channel.name, channel.description)
             callback_data = CB_CHANNEL_PREFIX + str(channel.id)
             keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data=cancel_callback_data)])
+        keyboard.append([InlineKeyboardButton("Abbrechen", callback_data=cancel_callback_data)])
         return InlineKeyboardMarkup(keyboard)
 
     @staticmethod
@@ -704,6 +750,10 @@ class MQBot(telegram.bot.Bot):
     @mq.queuedmessage
     def send_sticker(self, *args, **kwargs):
         return super(MQBot, self).send_sticker(*args, **kwargs)
+
+    @mq.queuedmessage
+    def send_video(self, *args, **kwargs):
+        return super(MQBot, self).send_video(*args, **kwargs)
 
     @mq.queuedmessage
     def edit_message_reply_markup(self, *args, **kwargs):
